@@ -1,0 +1,12 @@
+[db_server]
+52.174.93.232
+
+[cdh_manager]
+52.174.93.232
+
+[cdh_master]
+52.174.93.205
+
+[cdh_servers:children]
+cdh_master
+cdh_manager

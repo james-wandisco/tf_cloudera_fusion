@@ -1,0 +1,18 @@
+---
+
+- name: install kerberos server
+  yum:
+    name: krb5-server
+    state: installed
+
+- name: Start krb5kdc
+  service:
+    name: krb5kdc
+    state: started
+    enabled: yes
+
+- name: Start kadmin
+  service:
+    name: kadmin
+    state: started
+    enabled: yes

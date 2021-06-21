@@ -1,0 +1,6 @@
+---
+- name: install oracle-java
+  yum:
+    name:
+      - oracle-j2sdk1.8
+    state: latest

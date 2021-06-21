@@ -1,0 +1,8 @@
+vm_username_manager         = "dbi"
+vm_username_master      = "dbi"
+vm_username_worker1         = "dbi"
+vm_username_worker2         = "dbi"
+vm_username_worker3         = "dbi"
+vm_password         = "w@N15fo-wn33E"
+location = "westeurope"
+resource_group_name     = "SUPPORT-james.hughes1"

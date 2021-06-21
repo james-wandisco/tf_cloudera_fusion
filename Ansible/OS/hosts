@@ -1,0 +1,24 @@
+[db_server]
+manager ansible_host=<manager_ip> id=6
+
+[cdh_manager]
+manager  ansible_host=<manager_ip> id=6
+
+[cdh_master]
+master ansible_host=<master_ip>  id=5
+
+[cdh_worker]
+worker1 ansible_host=<worker1>  id=2
+worker2 ansible_host=<worker2>  id=3
+worker3 ansible_host=<worker3>  id=4
+
+[cdh_servers:children]
+cdh_worker
+cdh_master
+cdh_manager
+
+
+[all:vars]
+ansible_user=centos
+ansible_ssh_pass=<YOUR_PASSWORD>
+ansible_sudo_pass=<YOUR_PASSWORD>

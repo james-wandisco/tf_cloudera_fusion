@@ -1,0 +1,26 @@
+---
+
+db_hostname: "{{ hostvars[groups['db_server'][0]]['inventory_hostname'] }}"
+scm_hostname: "{{ hostvars[groups['cdh_manager'][0]]['inventory_hostname'] }}"
+
+cdh_version: 6.2.0
+cluster_display_name: cluster_1
+
+# Users and Groups
+group:
+  - terraformuser
+user:
+  - terraformuser
+
+# Java variables
+java_download_url: https://github.com/AdoptOpenJDK/openjdk8-binaries/releases/download/jdk8u292-b10/OpenJDK8U-jdk_x64_linux_hotspot_8u292b10.tar.gz
+java_download_folder: /usr/java
+java_name: "{{java_download_folder}}/jdk8u292-b10"
+java_archive: "{{java_download_folder}}/OpenJDK8U-jdk_x64_linux_hotspot_8u292b10.tar.gz"
+
+# Mysql Java connector
+mysql_java: mysql-connector-java-8.0.25.jar
+mysql_java_download_url: https://repo1.maven.org/maven2/mysql/mysql-connector-java/8.0.25/mysql-connector-java-8.0.25.jar
+mysql_java_download_folder: /usr/share/mysql-java/
+#mysql_java_archive: "{{ mysql_java_download_folder }}/{{ mysql_java }}.tar.gz"
+mysql_java_jar: /usr/share/java/mysql-connector-java.jar

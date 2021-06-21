@@ -1,0 +1,12 @@
+---
+- name: install kerberos libs workstation
+  yum:
+    name:
+      - krb5-workstation
+      - krb5-libs
+    state: latest
+
+- name: Add Kerberos config to all nodes
+  template:
+    src: ../templates/krb5.conf
+    dest: "/etc/krb5.conf"

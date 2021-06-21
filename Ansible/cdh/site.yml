@@ -1,0 +1,87 @@
+---
+# Cloudera playbook
+#
+#- name: Configure Cloudera Manager Repository
+#  become: ansible_become
+#  hosts: cdh_servers
+#  roles:
+#    - cm_repo
+#  tags: cm_repo
+#
+#- name: Configure Epel repository
+#  become: ansible_become
+#  hosts: cdh_servers
+#  roles:
+#    - epel
+#  tags: epel_repo
+##
+#- name: OS Configuration
+#  become: ansible_become
+#  hosts: cdh_servers
+#  roles:
+#    - os_config
+#  tags: os_config
+
+#- name: Install Java JDK 8
+#  become: ansible_become
+#  hosts: cdh_servers
+#  roles:
+#    - java
+#  tags: java
+
+#- name: Install Oracle Java
+#  become: ansible_become
+#  hosts: cdh_servers
+#  roles:
+#    - oracle-java
+#  tags: cm_repo
+#
+#- name: Install MySQL Java Connector
+#  become: ansible_become
+#  hosts: cdh_servers
+#  roles:
+#    - mysql_connector
+#  tags: mysql_java_connector
+#
+#- name: Install MariaDB on specificed host
+#  hosts: db_server
+#  roles:
+#    - mysql_mariadb_install
+#  tags: mysql
+
+#- name: Install MariaDB and create databases
+#  hosts: db_server
+#  roles:
+#    - mariadb
+#  tags: mysql
+
+#- name: MySQL secure config
+#  hosts: db_server
+#  roles:
+#    - mysql_secure_config
+#  tags: mysql
+
+#- name: Create MySQL dbs for Cloudera
+#  hosts: db_server
+#  roles:
+#    - mysql_create_dbs
+#  tags: mysql
+
+##### Cloudera Installation ####
+#
+#- name: Install Cloudera Manager Agents
+#  hosts: cdh_servers
+#  roles:
+#    - cm_agents
+#  tags: cm_agents
+
+- name: Install Kerberos client
+  hosts: cdh_servers
+  roles:
+    - kerberos_client
+
+
+- name: Install Kerberos server
+  hosts: cdh_manager
+  roles:
+    - kerberos_server
