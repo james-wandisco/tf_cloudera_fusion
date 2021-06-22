@@ -1,0 +1,4 @@
+---
+- name: Clean yarn localdirs
+  file: path=/data/yarn/nmlocal/{{item}} state=absent
+  loop: "{{range(1, datanode_dir_count+1)|list}}"

@@ -1,0 +1,3 @@
+---
+- include: clean.yml
+  when: is_running_security
