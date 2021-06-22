@@ -1,0 +1,491 @@
+---
+- name: "update threshold settings"
+  uri:
+    url: '{{cm_api_uri}}/clusters/{{cluster}}/services/{{ item.service }}/roleConfigGroups/{{ item.group }}/config'
+    user: admin
+    password: admin
+    method: PUT
+    status_code: 200,204
+    return_content: yes
+    body_format: json
+    body: >-
+      {
+        "items": [
+          {
+            "name": "log_directory_free_space_absolute_thresholds",
+            "value": "{\"warning\":\"1073741824\",\"critical\":\"536870912\"}"
+          },
+          {
+            "name": "log_threshold",
+            "value": "{{log_threshold}}"
+          }
+        ]
+      }
+  loop_control:
+    label: "{{item.group}}"
+  loop:
+    - { service: '{{ cdh_hdfs_service_name }}', group: '{{ cdh_hdfs_service_name }}-DATANODE-BASE' }
+    - { service: '{{ cdh_hdfs_service_name }}', group: '{{ cdh_hdfs_service_name }}-NAMENODE-BASE' }
+    - { service: '{{ cdh_hdfs_service_name }}', group: '{{ cdh_hdfs_service_name }}-SECONDARYNAMENODE-BASE' }
+    - { service: '{{ cdh_yarn_service_name }}', group: '{{ cdh_yarn_service_name }}-JOBHISTORY-BASE' }
+    - { service: '{{ cdh_yarn_service_name }}', group: '{{ cdh_yarn_service_name }}-NODEMANAGER-BASE' }
+    - { service: '{{ cdh_yarn_service_name }}', group: '{{ cdh_yarn_service_name }}-RESOURCEMANAGER-BASE' }
+    - { service: '{{ cdh_hdfs_service_name }}', group: '{{ cdh_hdfs_service_name }}-NAMENODE-BASE' }
+    - { service: '{{ cdh_hdfs_service_name }}', group: '{{ cdh_hdfs_service_name }}-SECONDARYNAMENODE-BASE' }
+  register: rolethresholds
+  tags:
+    - create-cdh-cluster
+    - check-cluster-created
+    - post-config
+
+- name: "debug var=rolethresholds"
+  debug: var=rolethresholds
+  when: debug
+  tags:
+    - create-cdh-cluster
+    - check-cluster-created
+    - post-config
+
+- name: "update service settings"
+  uri:
+    url: '{{cm_api_uri}}/clusters/{{cluster}}/services/{{item.service}}/config'
+    user: admin
+    password: admin
+    method: PUT
+    status_code: 200,204
+    return_content: yes
+    body_format: json
+    body:
+        items: "{{item.properties}}"
+  loop_control:
+    label: "{{item.service}}"
+  loop:
+    - service: '{{ cdh_hdfs_service_name }}'
+      properties:
+        - name: failover_controllers_healthy_enabled
+          value: "false"
+        - name: "{{hdfs_active_namenode_detection_window}}"
+          value: 5
+        - name: hdfs_standby_namenodes_health_enabled
+          value: "false"
+        - name: redaction_policy_enabled
+          value: "{{redaction_policy_enabled}}"
+    - service: '{{ cdh_yarn_service_name }}'
+      properties:
+        - name: yarn_standby_resourcemanager_health_enabled
+          value: "false"
+        - name: "{{yarn_active_resourcemanager_detection_window}}"
+          value: 5
+  register: servicesettings
+  tags:
+    - create-cdh-cluster
+    - check-cluster-created
+    - post-config
+
+- name: "debug var=servicesettings"
+  debug: var=servicesettings
+  when: debug
+  tags:
+    - create-cdh-cluster
+    - check-cluster-created
+    - post-config
+
+- name: "set zookeeper service for hdfs HA"
+  uri:
+    url: '{{cm_api_uri}}/clusters/{{cluster}}/services/{{cdh_hdfs_service_name}}/config'
+    user: admin
+    password: admin
+    method: PUT
+    status_code: 200,204
+    return_content: yes
+    body_format: json
+    body: >-
+      {
+        "items": [
+          {
+            "name": "zookeeper_service",
+            "value": "{{zookeeper_service_name}}"
+          }
+        ]
+      }
+  when: is_running_ha
+  tags:
+    - create-cdh-cluster
+    - check-cluster-created
+    - post-config
+
+
+- name: "update cm service log threshold settings"
+  uri:
+    url: '{{cm_api_uri}}/cm/service/roleConfigGroups/{{item}}/config'
+    user: admin
+    password: admin
+    method: PUT
+    status_code: 200,204
+    return_content: yes
+    body_format: json
+    body: >-
+      {
+        "items": [
+          {
+            "name": "log_directory_free_space_absolute_thresholds",
+            "value": "{\"warning\":\"1073741824\",\"critical\":\"536870912\"}"
+          },
+          {
+            "name": "log_threshold",
+            "value": "{{log_threshold}}"
+          }
+        ]
+      }
+  loop:
+    - mgmt-ALERTPUBLISHER-BASE
+    - mgmt-EVENTSERVER-BASE
+    - mgmt-HOSTMONITOR-BASE
+    - mgmt-SERVICEMONITOR-BASE
+    - mgmt-ACTIVITYMONITOR-BASE
+  register: cmsthresholds
+  tags:
+    - create-cdh-cluster
+    - check-cluster-created
+    - post-config
+
+
+- name: "debug var=cmsthresholds"
+  debug: var=cmsthresholds
+  when: debug
+  tags:
+    - create-cdh-cluster
+    - check-cluster-created
+    - post-config
+
+- name: "update cm service storagedir threshold settings"
+  uri:
+    url: '{{cm_api_uri}}/cm/service/roleConfigGroups/{{item}}/config'
+    user: admin
+    password: admin
+    method: PUT
+    status_code: 200,204
+    return_content: yes
+    body_format: json
+    body: >-
+      {
+        "items": [
+          {
+            "name": "firehose_storage_directory_free_space_absolute_thresholds",
+            "value": "{\"warning\":\"1073741824\",\"critical\":\"536870912\"}"
+          },
+          {
+            "name": "log_threshold",
+            "value": "{{log_threshold}}"
+          }
+        ]
+      }
+  loop:
+    - mgmt-HOSTMONITOR-BASE
+    - mgmt-SERVICEMONITOR-BASE
+  register: cmsthresholds
+  tags:
+    - create-cdh-cluster
+    - check-cluster-created
+    - post-config
+
+- name: "debug var=cmsthresholds"
+  debug: var=cmsthresholds
+  when: debug
+  tags:
+    - create-cdh-cluster
+    - check-cluster-created
+    - post-config
+
+- name: "update cm service eventserver threshold settings"
+  uri:
+    url: '{{cm_api_uri}}/cm/service/roleConfigGroups/{{item}}/config'
+    user: admin
+    password: admin
+    method: PUT
+    status_code: 200,204
+    return_content: yes
+    body_format: json
+    body: >-
+      {
+        "items": [
+          {
+            "name": "eventserver_index_directory_free_space_absolute_thresholds",
+            "value": "{\"warning\":\"1073741824\",\"critical\":\"536870912\"}"
+          },
+          {
+            "name": "event_server_heapsize",
+            "value": "{{event_server_heapsize}}"
+          }
+        ]
+      }
+  loop:
+    - mgmt-EVENTSERVER-BASE
+  register: cmsthresholds
+  tags:
+    - create-cdh-cluster
+    - check-cluster-created
+    - post-config
+
+
+- name: "debug var=cmsthresholds"
+  debug: var=cmsthresholds
+  when: debug
+  tags:
+    - create-cdh-cluster
+    - check-cluster-created
+    - post-config
+
+- name: "update cm service servicewide settings"
+  uri:
+    url: '{{cm_api_uri}}/cm/service/config'
+    user: admin
+    password: admin
+    method: PUT
+    status_code: 200,204
+    return_content: yes
+    body_format: json
+    body: >-
+      {
+        "items": [
+          {
+            "name": "mgmt_embedded_database_free_space_absolute_thresholds",
+            "value": "{\"warning\":\"1073741824\",\"critical\":\"536870912\"}"
+          },
+          {
+            "name": "mgmt_navigator_health_enabled",
+            "value": "false"
+          },
+          {
+            "name": "mgmt_navigatormetaserver_health_enabled",
+            "value": "false"
+          },
+          {
+            "name": "mgmt_reportsmanager_health_enabled",
+            "value": "false"
+          }
+        ]
+      }
+  register: cmssettings
+  tags:
+    - create-cdh-cluster
+    - check-cluster-created
+    - post-config
+
+- name: "update MGMT_AUX_PATH for LDP"
+  uri:
+    url: '{{cm_api_uri}}/cm/service/roleConfigGroups/mgmt-SERVICEMONITOR-BASE/config'
+    user: admin
+    password: admin
+    method: PUT
+    status_code: 200,204
+    body_format: json
+    body:
+      items:
+        - name: SERVICEMONITOR_role_env_safety_valve
+          value: MGMT_AUX_PATH=/etc/wandisco/fusion/conf
+  when: is_running_ldp
+
+- name: "refresh config files in cluster"
+  uri:
+    url={{cm_api_uri}}/clusters/{{ cdh_cluster_name }}/commands/refresh
+    user=admin
+    password=admin
+    method=POST
+    status_code=200
+  tags:
+    - deploy-client-config
+    - create-cdh-cluster
+    - check-cluster-created
+
+#
+# enable CM trial license
+#
+
+- name: "get activitymonitor db host value"
+  command: awk -F= '/ACTIVITYMONITOR.db.host/ {print $2}' /etc/cloudera-scm-server/db.mgmt.properties
+  register: amondbhost
+  when: is_running_cmtrial
+  tags:
+    - create-cdh-cluster
+    - check-cluster-created
+    - post-config
+
+- name: "get activitymonitor db passwd value"
+  command: awk -F= '/ACTIVITYMONITOR.db.password/ {print $2}' /etc/cloudera-scm-server/db.mgmt.properties
+  register: amondbpasswd
+  when: is_running_cmtrial
+  tags:
+    - create-cdh-cluster
+    - check-cluster-created
+    - post-config
+
+- name: "get reportsmanager db host value"
+  command: awk -F= '/REPORTSMANAGER.db.host/ {print $2}' /etc/cloudera-scm-server/db.mgmt.properties
+  register: rmandbhost
+  when: is_running_cmtrial
+  tags:
+    - create-cdh-cluster
+    - check-cluster-created
+    - post-config
+
+- name: "get reportsmanager db passwd value"
+  command: awk -F= '/REPORTSMANAGER.db.password/ {print $2}' /etc/cloudera-scm-server/db.mgmt.properties
+  register: rmandbpasswd
+  when: is_running_cmtrial
+  tags:
+    - create-cdh-cluster
+    - check-cluster-created
+    - post-config
+
+- name: "get navigator db host value"
+  command: awk -F= '/NAVIGATOR.db.host/ {print $2}' /etc/cloudera-scm-server/db.mgmt.properties
+  register: navdbhost
+  when: is_running_cmtrial
+  tags:
+    - create-cdh-cluster
+    - check-cluster-created
+    - post-config
+
+- name: "get navigator db passwd value"
+  command: awk -F= '/NAVIGATOR.db.password/ {print $2}' /etc/cloudera-scm-server/db.mgmt.properties
+  register: navdbpasswd
+  when: is_running_cmtrial
+  tags:
+    - create-cdh-cluster
+    - check-cluster-created
+    - post-config
+
+- name: "get navigatormetaserver db host value"
+  command: awk -F= '/NAVIGATORMETASERVER.db.host/ {print $2}' /etc/cloudera-scm-server/db.mgmt.properties
+  register: navmsdbhost
+  when: is_running_cmtrial
+  tags:
+    - create-cdh-cluster
+    - check-cluster-created
+    - post-config
+
+- name: "get navigatormetaserver db passwd value"
+  command: awk -F= '/NAVIGATORMETASERVER.db.password/ {print $2}' /etc/cloudera-scm-server/db.mgmt.properties
+  register: navmsdbpasswd
+  when: is_running_cmtrial
+  tags:
+    - create-cdh-cluster
+    - check-cluster-created
+    - post-config
+
+
+- name: "CM Enterprise Trial - update cm enterprise services"
+  uri:
+    url: '{{cm_api_uri}}/cm/service/roleConfigGroups/{{item.group}}/config'
+    user: admin
+    password: admin
+    method: PUT
+    status_code: 200,204
+    return_content: yes
+    body_format: json
+    body:
+      items: "{{item.properties}}"
+  loop_control:
+    label: "{{item.group}}"
+  loop:
+    - group: 'mgmt-ACTIVITYMONITOR-BASE'
+      properties:
+        - name: log_directory_free_space_absolute_thresholds
+          value: "{\"warning\":1073741824,\"critical\":536870912}"
+        - name: firehose_database_host
+          value: "{{amondbhost.stdout}}"
+        - name: firehose_database_user
+          value: amon
+        - name: firehose_database_password
+          value: "{{amondbpasswd.stdout}}"
+        - name: firehose_database_name
+          value: amon
+        - name: firehose_database_type
+          value: postgresql
+        - name: firehose_heapsize
+          value: "{{firehose_heapsize}}"
+    - group: 'mgmt-NAVIGATOR-BASE'
+      properties:
+        - name: log_directory_free_space_absolute_thresholds
+          value: "{\"warning\":1073741824,\"critical\":536870912}"
+        - name: navigator_database_host
+          value: "{{navdbhost.stdout}}"
+        - name: navigator_database_password
+          value: "{{navdbpasswd.stdout}}"
+        - name: navigator_database_type
+          value: postgresql
+    - group: 'mgmt-NAVIGATORMETASERVER-BASE'
+      properties:
+        - name: log_directory_free_space_absolute_thresholds
+          value: "{\"warning\":1073741824,\"critical\":536870912}"
+        - name: nav_metaserver_database_host
+          value: "{{navmsdbhost.stdout}}"
+        - name: nav_metaserver_database_password
+          value: "{{navmsdbpasswd.stdout}}"
+        - name: nav_metaserver_database_type
+          value: postgresql
+    - group: 'mgmt-REPORTSMANAGER-BASE'
+      properties:
+        - name: log_directory_free_space_absolute_thresholds
+          value: "{\"warning\":1073741824,\"critical\":536870912}"
+        - name: reportsmanager_scratch_directory_free_space_absolute_thresholds
+          value: "{\"warning\":1073741824,\"critical\":536870912}"
+        - name: headlamp_database_host
+          value: "{{rmandbhost.stdout}}"
+        - name: headlamp_database_user
+          value: rman
+        - name: headlamp_database_password
+          value: "{{rmandbpasswd.stdout}}"
+        - name: headlamp_database_name
+          value: rman
+        - name: headlamp_database_type
+          value: postgresql
+  when: is_running_cmtrial
+  tags:
+    - create-cdh-cluster
+    - check-cluster-created
+    - post-config
+
+- name: "Restart Cloudera Management Service"
+  uri:
+    url={{cm_api_uri}}/cm/service/commands/restart
+    user=admin
+    password=admin
+    method=POST
+    status_code=200
+    return_content=yes
+  register: cmsrestart
+  tags:
+    - create-cdh-cluster
+    - check-cluster-created
+    - post-config
+
+- name: "debug var=cmsrestart"
+  debug: var=cmsrestart
+  when: debug
+  tags:
+    - create-cdh-cluster
+    - check-cluster-created
+    - post-config
+
+- name: "debug var=firstdone.json"
+  debug: var=firstdone.json
+  when: is_running_security and debug
+  tags:
+    - create-cdh-cluster
+    - check-cluster-created
+
+- name: "debug var=firstdone.json.active"
+  debug: var=firstdone.json.active
+  when: is_running_security and debug
+  tags:
+    - create-cdh-cluster
+    - check-cluster-created
+
+- name: "debug var=firstdone.json.success"
+  debug: var=firstdone.json.success
+  when: is_running_security and debug
+  tags:
+    - create-cdh-cluster
+    - check-cluster-created

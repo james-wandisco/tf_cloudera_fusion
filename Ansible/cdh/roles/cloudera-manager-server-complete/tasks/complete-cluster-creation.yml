@@ -1,0 +1,166 @@
+---
+- name: "wait for parcel distribution to complete...checking status"
+  uri:
+    url={{cm_api_uri}}/clusters/{{ cdh_cluster_name }}/parcels/products/CDH/versions/{{ cdh_parcel_version }}
+    user=admin
+    password=admin
+    status_code=200,204
+    return_content=yes
+    timeout=120
+  register: parceldiststat
+  until:
+    - parceldiststat.json is defined
+    - parceldiststat.json.stage is defined
+    - parceldiststat.json.stage in ["ACTIVATING", "ACTIVATED"] or (parceldiststat.json.stage == "DISTRIBUTED" and parceldiststat.json.state.count == all_dc_nodes|length)
+  retries: 360
+  delay: 10
+  when: is_running_parcels
+  tags:
+    - create-cdh-cluster
+
+- name: "activate parcel"
+  uri:
+    url={{cm_api_uri}}/clusters/{{ cdh_cluster_name }}/parcels/products/CDH/versions/{{ cdh_parcel_version }}/commands/activate
+    user=admin
+    password=admin
+    method=POST
+    status_code=200
+    return_content=yes
+  when: parceldiststat.json.stage == "DISTRIBUTED" and parceldiststat.json.state.count == all_dc_nodes|length
+  register: parcelactivate
+  tags:
+    - create-cdh-cluster
+    - activate-local-parcel
+
+- name: "wait for parcel activation to complete...checking status"
+  uri:
+    url={{cm_api_uri}}/clusters/{{ cdh_cluster_name }}/parcels/products/CDH/versions/{{ cdh_parcel_version }}
+    user=admin
+    password=admin
+    method=GET
+    status_code=200,204
+    return_content=yes
+    timeout=120
+  register: parcelactivatestat
+  until:
+    - parcelactivatestat.json is defined
+    - parcelactivatestat.json.stage is defined
+    - parcelactivatestat.json.stage == "ACTIVATED"
+    - parcelactivatestat.json.state.progress == 0
+    - parcelactivatestat.json.state.totalProgress == 0
+    - parcelactivatestat.json.state.count == 0
+  retries: 180
+  delay: 20
+  when: parceldiststat.json.stage == "DISTRIBUTED" and parceldiststat.json.state.count == all_dc_nodes|length
+  tags:
+    - create-cdh-cluster
+    - activate-local-parcel
+
+- include_role: name=ldp-parcel-activate
+  vars:
+    parcel_name: FUSION
+    parcel_version_suffix: ""
+  when: is_running_ldp
+
+- include_role: name=ldp-parcel-activate
+  vars:
+    parcel_name: FUSION_CLIENT
+    parcel_version_suffix: ".cdh{{cdh_major_version}}"
+  when: is_running_ldp
+
+## end parcel deployment
+
+- name: "content of DC slaves"
+  slurp: src=/var/tmp/dc-hosts.yml
+  register: dcslaves
+  tags:
+    - create-cdh-cluster
+    - prep-cdh-cluster
+
+- name: "apply host templates to slaves"
+  uri:
+    url: "{{cm_api_uri}}/clusters/{{ cdh_cluster_name }}/hostTemplates/{{ cm_slave_template }}/commands/applyHostTemplate"
+    user: admin
+    password: admin
+    method: POST
+    status_code: 200
+    return_content: yes
+    body: "{{dcslaves.content|b64decode|from_yaml}}"
+    body_format: json
+  when: "'\"serviceState\" : \"STARTED\"' not in cmsstat.content"
+  register: applyhosttemplate
+  retries: 5
+  delay: 5
+  until: not applyhosttemplate is failed
+  tags:
+    - create-cdh-cluster
+
+- name: "Set Journalnode default group up (HA only)"
+  uri:
+    url: "{{cm_api_uri}}/clusters/{{ cdh_cluster_name }}/services/{{ cdh_hdfs_service_name }}/roleConfigGroups/{{ cdh_hdfs_service_name}}-JOURNALNODE-BASE/config"
+    user: admin
+    password: admin
+    method: PUT
+    status_code: 200,201,202
+    return_content: yes
+    body: '{"items":[{"name":"dfs_journalnode_edits_dir","value":"/data/dfs/nnedits"}]}'
+    body_format: json
+  when: is_running_ha
+  tags:
+    - create-cdh-cluster
+
+
+
+###
+## Start cluster
+###
+
+- name: "Start Cloudera Management Service"
+  uri:
+    url={{cm_api_uri}}/cm/service/commands/start
+    user=admin
+    password=admin
+    method=POST
+    status_code=200
+    return_content=yes
+  when: "'\"serviceState\" : \"STARTED\"' not in cmsstat.content"
+  register: cmsstart
+  tags:
+    - create-cdh-cluster
+
+- name: "debug var=cmsstart"
+  debug: var=cmsstart
+  when: debug
+  tags:
+    - create-cdh-cluster
+    - check-cluster-created
+    - prep-cdh-cluster
+
+- name: "issue firstRun start up of cluster"
+  uri:
+    url={{cm_api_uri}}/clusters/{{ cdh_cluster_name }}/commands/firstRun
+    user=admin
+    password=admin
+    method=POST
+    status_code=200,204
+    return_content=yes
+  register: cdhstart
+  tags:
+    - create-cdh-cluster
+    - check-cluster-created
+
+
+- name: "debug var=cdhstart"
+  debug: var=cdhstart
+  when: debug
+  tags:
+    - create-cdh-cluster
+    - check-cluster-created
+
+- name: "debug var=cdhstart.json"
+  debug: var=cdhstart.json
+  when: debug
+  tags:
+    - create-cdh-cluster
+    - check-cluster-created
+

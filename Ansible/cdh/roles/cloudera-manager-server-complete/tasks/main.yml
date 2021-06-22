@@ -1,0 +1,3 @@
+---
+- include: complete-cluster-creation.yml tags=create-cluster
+- include: post.yml tags=create-cluster
