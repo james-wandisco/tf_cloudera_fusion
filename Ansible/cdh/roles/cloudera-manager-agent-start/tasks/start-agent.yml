@@ -1,0 +1,39 @@
+---
+- name: "Copy stop script"
+  copy: src=stop-cloudera.py dest=/var/tmp/stop-cloudera mode=0755
+  when: ansible_facts.service_mgr != "systemd" and cm_major_version < 6
+
+- name: "Run stop script"
+  command: /var/tmp/stop-cloudera
+  register: stop_cmf
+  retries: 10
+  delay: 2
+  until: stop_cmf.rc|default(1) == 0
+  when: ansible_facts.service_mgr != "systemd" and cm_major_version < 6
+
+- name: "Remove pid file"
+  file: path=/var/run/cloudera-scm-agent/cloudera-scm-agent.pid state=absent
+  when: ansible_facts.service_mgr != "systemd" and cm_major_version < 6
+
+- name: "Stop Cloudera Manager Agent - systemd"
+  service: name=cloudera-scm-agent state=stopped
+  when: ansible_facts.service_mgr == "systemd" or cm_major_version >= 6
+
+- name: "Wait for manager to be online"
+  wait_for: host={{cm_remote_server}} port={{cm_server_port}}
+
+# This needs to be restart rather than start to cover systemd based systems.
+# It's not really systemd's fault this time but due to the way cmf-agent spawns
+# multiple processes systemd still sees processes in the cgroup after the agent
+# is killed so it'll do a noop on start. Restart sorts this out.
+#
+- name: "Start Cloudera Manager Agent"
+  service: name=cloudera-scm-agent state=restarted
+
+- name: "Really Start Cloudera Manager Agent - CentOS/RHEL 7"
+  command: systemctl restart cloudera-scm-agent
+  when: ansible_facts.os_family == 'RedHat' and ansible_facts.distribution_major_version == '7'
+
+- name: "Really Start Cloudera Manager Agent - SLES 12"
+  command: systemctl restart cloudera-scm-agent
+  when: ansible_facts.os_family == 'Suse' and ansible_facts.distribution_major_version == '12'
