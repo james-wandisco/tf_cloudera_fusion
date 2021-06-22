@@ -1,0 +1,27 @@
+---
+
+# Most Linux platforms include a feature called Transparent Huge Page compaction
+# which interacts poorly with Hadoop workloads and can seriously degrade
+# performance. It is advisable to disable Transparent Huge Pages on all hosts.
+# This module first checks if it is running on Docker.
+
+
+- name: "check status of Transparent Huge Pages"
+  command: grep '\[never\]' /sys/kernel/mm/transparent_hugepage/enabled
+  register: thptest
+  ignore_errors: true
+  when: not docker_check.stat.exists
+
+- name: "disable Transparent Huge Pages"
+  shell: echo never > /sys/kernel/mm/transparent_hugepage/enabled; echo 'echo never > /sys/kernel/mm/transparent_hugepage/enabled' >> /etc/rc.local
+  when: not docker_check.stat.exists and thptest is failed
+
+- name: "check status of Transparent Huge Pages Defrag"
+  command: grep '\[never\]' /sys/kernel/mm/transparent_hugepage/defrag
+  register: thpdtest
+  ignore_errors: true
+  when: not docker_check.stat.exists
+
+- name: "disable Transparent Huge Pages Defrag"
+  shell: echo never > /sys/kernel/mm/transparent_hugepage/defrag; echo 'echo never > /sys/kernel/mm/transparent_hugepage/defrag' >> /etc/rc.local
+  when: not docker_check.stat.exists and thpdtest is failed

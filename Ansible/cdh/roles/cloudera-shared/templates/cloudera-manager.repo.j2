@@ -1,0 +1,15 @@
+{% if cm_version == "5.4.2" -%}
+{% set cm_version_fixed = "5.4.1" -%}
+{% else -%}
+{% set cm_version_fixed = cm_version -%}
+{% endif -%}
+[cloudera-manager-{{ cm_version_fixed }}]
+name=Cloudera Manager
+{% if cm_major_version|int == 5 -%}
+baseurl={{cm_repo_base}}/{{cm_repo_families[ansible_facts.distribution]}}/{{ansible_facts.distribution_major_version}}/x86_64/cm/{{ cm_version_fixed }}/
+gpgkey={{cm_repo_base}}/{{cm_repo_families[ansible_facts.distribution]}}/{{ansible_facts.distribution_major_version}}/x86_64/cm/RPM-GPG-KEY-cloudera
+{% else %}
+baseurl={{cm_repo_base}}/{{cm_version_fixed}}/{{cm_repo_families[ansible_facts.distribution]}}{{ansible_facts.distribution_major_version}}/yum/
+gpgkey={{cm_repo_base}}/{{cm_version_fixed}}/{{cm_repo_families[ansible_facts.distribution]}}{{ansible_facts.distribution_major_version}}/yum/RPM-GPG-KEY-cloudera
+{% endif -%}
+gpgcheck=1

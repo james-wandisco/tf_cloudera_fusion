@@ -1,0 +1,29 @@
+---
+  
+- name: "remove any hdp repo files if they exist"
+  file: path={{ item }} state=absent
+  loop:
+    - /etc/yum.repos.d/HDP.repo
+    - /etc/yum.repos.d/HDP-UTILS.repo
+    - /etc/yum.repos.d/ambari.repo
+    - /root/HDP.repo
+  tags:
+    - deploy-cm-agent
+    - install-cloudera-manager-agent
+    - install-cloudera-manager-server
+    - install-cdh
+    - deploy-cdh-repos
+    - create-cluster
+
+- name: "disable internal shdc repo to prevent timeouts while yum install of CDH is taking place"
+  replace: dest=/etc/yum.repos.d/shdc.repo regexp='enabled=1' replace='enabled=0' backup=no
+
+#
+# deploy cloudera manager repo file
+# placing copy of CDH repo file in /root ; will be used later during ml installer run
+#
+- name: "deploy cloudera manager yum repo files"
+  template: src={{ item.src }} dest={{ item.dest }} owner=root group=root mode=0644
+  loop:
+    - { src: 'cloudera-manager.repo.j2', dest: '/etc/yum.repos.d/cloudera-manager-{{ cm_repo_version }}.repo' }
+  when: cdh_version is version('6.3.3', '<')

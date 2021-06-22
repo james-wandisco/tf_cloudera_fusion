@@ -1,0 +1,3 @@
+---
+- include: cdh.yml
+  when: is_running_cdh and external_manager is defined

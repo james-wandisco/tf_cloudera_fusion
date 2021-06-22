@@ -1,4 +1,9 @@
 ---
-
+kerberos_server_master_db_pass: admin
+kerberos_server_kadmin_pass: admin
+kerberos_server_kadmin_user: root
+kerberos_server_realm_name: WANDISCO.HADOOP
 ansible_become: true
 tmp_dir: /tmp
+
+cm_repo_base: "http://mirror03.ashb.wandisco.com/cloudera-repos/{{cm_repo_version|lower}}"

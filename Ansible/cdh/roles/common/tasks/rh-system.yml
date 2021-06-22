@@ -1,0 +1,54 @@
+---
+
+# double-check that time is synchronized ; 
+# if not synchronized, will cause problems with security (kerberos) or hbase;
+# stop/start ntpd and ntpdate
+- name: "stop ntpdate and ntpd"
+  service: name={{ item }} state=stopped enabled=yes
+  when: not skip_ntp
+  loop:
+    - ntpd
+    - ntpdate
+
+- name: "start ntpdate"
+  service: name=ntpdate state=started enabled=yes
+  when: not skip_ntp
+  ignore_errors: yes
+
+- name: "start ntpd"
+  service: name=ntpd state=started enabled=yes
+  when: not skip_ntp
+
+- name: "enable ssh"
+  service: name=sshd state=started enabled=yes
+
+- name: "disable epel repo - causes occasional issues with yum"
+  replace: dest=/etc/yum.repos.d/epel.repo regexp='^enabled=1' replace='enabled=0'
+  when: ansible_facts.distribution_major_version != '7'
+
+- name: "Check if /var/run is a symlink (CentOS 7)"
+  stat: path=/var/run
+  register: var_run
+  when: docker_check.stat.exists and ansible_facts.distribution_major_version == '7'
+  tags:
+    - resize-run
+
+- name: "Disable python verification in CentOS 7"
+  lineinfile: path=/etc/python/cert-verification.cfg regexp='verify=' line='verify=disable'
+  when: ansible_facts.distribution_major_version == '7'
+
+- name: "Add service to resize /run (CentOS 7)"
+  copy: src=resize-run.service dest=/usr/lib/systemd/system
+  when: docker_check.stat.exists and ansible_facts.distribution_major_version == '7' and var_run.stat.islnk is defined and var_run.stat.islnk
+  tags:
+    - resize-run
+
+- name: "Start and enable resize-run (CentOS 7)"
+  service: name=resize-run state=started enabled=yes
+  when: docker_check.stat.exists and ansible_facts.distribution_major_version == '7' and var_run.stat.islnk is defined and var_run.stat.islnk
+  tags:
+    - resize-run
+
+- name: "Fix postgresql-setup for CentOS 7"
+  lineinfile: path=/bin/postgresql-setup line="systemctl() { echo Environment=PGPORT=5432 PGDATA=/var/lib/pgsql/data; }" insertafter="#!/bin/bash" firstmatch=yes state=present create=yes
+  when: ansible_facts.distribution_major_version == '7'

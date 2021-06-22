@@ -1,0 +1,48 @@
+---
+
+- name: "create root .ssh directory"
+  file: path=/root/.ssh state=directory mode=0700 owner=root group=root
+  when: is_sshkeygen_enabled
+  tags:
+    - install-ssh-key
+ 
+- name: "copy root ssh files to .ssh"
+  copy: src={{ item.src }} dest=/root/.ssh/{{ item.dest }} owner={{ item.owner }} group={{ item.group }} mode={{ item.mode }} backup=no
+  loop:
+    - { src: 'rssh', dest: 'id_rsa', owner: 'root', group: 'root', mode: '0600' }
+    - { src: 'rssh.pub', dest: 'id_rsa.pub', owner: 'root', group: 'root', mode: '0644' }
+    - { src: 'config.ssh', dest: 'config', owner: 'root', group: 'root', mode: '0644' }
+  when: is_sshkeygen_enabled
+  tags:
+    - install-ssh-key
+ 
+- name: "add root ssh public key to authorized_keys"
+  authorized_key: user=root key="{{ lookup('file', 'roles/common/files/rssh.pub') }}" path='/root/.ssh/authorized_keys'
+  when: is_sshkeygen_enabled
+  tags:
+    - install-ssh-key
+
+- name: "add vagrant ssh public key to authorized_keys for root"
+  authorized_key: user=root key="{{ lookup('file', 'roles/common/files/vagrant.pub') }}" path='/root/.ssh/authorized_keys'
+  when: is_sshkeygen_enabled and (not is_do_vm)
+  tags:
+    - install-ssh-key
+
+- name: "add devkey ssh public key to authorized_keys for root"
+  authorized_key: user=root key="{{ lookup('file', 'roles/common/files/devkey.pub') }}" path='/root/.ssh/authorized_keys'
+  when: is_sshkeygen_enabled and (not is_do_vm)
+  tags:
+    - install-ssh-key
+
+- name: "add vagrant ssh public key to authorized_keys for vagrant"
+  authorized_key: user=vagrant key="{{ lookup('file', 'roles/common/files/vagrant.pub') }}"
+  when: is_sshkeygen_enabled and (not is_do_vm) and docker_check.stat.exists
+  tags:
+    - install-ssh-key
+
+- name: "add vagrant ssh private key"
+  copy: src=vagrant dest=/home/vagrant/.ssh/id_rsa owner=vagrant group=vagrant mode='0600'
+  when: is_sshkeygen_enabled and (not is_do_vm) and docker_check.stat.exists
+  tags:
+    - install-ssh-key
+

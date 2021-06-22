@@ -1,0 +1,27 @@
+---
+
+- name: "Check for required variables"
+  fail: msg="Required variable not set"
+  when: is_running_ha and item.value == ''
+  loop_control:
+    label: "{{item.name}}"
+  loop:
+    - { name: 'standby_namenode', value: "{{standby_namenode}}" }
+    - { name: 'failover_controllers', value: "{{failover_controllers}}" }
+    - { name: 'journalnodes', value: "{{journalnodes}}" }
+
+- name: "copy misc files"
+  copy: src={{ item.src }} dest={{ item.dest }} owner={{ item.owner }} group={{ item.group }} mode={{ item.mode }} backup={{ item.backup }}
+  loop_control:
+    label: "{{item.src}} -> {{item.dest}}"
+  loop:
+    - { src: 'hosts.ehf.txt', dest: '/etc/hosts', owner: 'root', group: 'root', mode: '0644', backup: 'yes' }
+  when: is_local_vm
+
+- name: "copy do hosts files"
+  copy: src={{ item.src }} dest={{ item.dest }} owner={{ item.owner }} group={{ item.group }} mode={{ item.mode }} backup={{ item.backup }}
+  loop_control:
+    label: "{{item.src}} -> {{item.dest}}"
+  loop:
+    - { src: 'hosts.do.txt', dest: '/etc/hosts', owner: 'root', group: 'root', mode: '0644', backup: 'yes' }
+  when: is_do_vm

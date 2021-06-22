@@ -1,0 +1,6 @@
+# Packages for Cloudera's Distribution for Hadoop, Version 4, on Ubuntu
+{% if cm_major_version|int >= 6 -%}
+deb [arch=amd64] {{cm_repo_base}}/{{cm_version}}/{{cm_repo_families[ansible_facts.distribution]}}{{ansible_facts.distribution_version|replace('.', '')}}/apt {{ansible_facts.distribution_release}}-cm{{cm_version}} contrib
+{% else -%}
+deb [arch=amd64] {{cm_repo_base}}/ubuntu/{{ansible_facts.distribution_release}}/amd64/cm {{ansible_facts.distribution_release}}-cm{{cm_version}} contrib
+{% endif -%}

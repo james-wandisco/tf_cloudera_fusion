@@ -1,0 +1,14 @@
+---
+- name: "Put set-repo script in place"
+  copy: src=set-repo.sh dest=/tmp/set-repo.sh mode=0755
+
+- name: "Get fastest repo"
+  command: /tmp/set-repo.sh
+  register: fastest_repo
+
+- name: "Show repo (debug)"
+  debug: var=fastest_repo.stdout
+  when: debug
+
+- name: "Set wd_mirror_server fact"
+  set_fact: wd_mirror_server={{fastest_repo.stdout}}

@@ -1,0 +1,3 @@
+---
+- name: "Check we can reach {{wd_mirror_server}}"
+  uri: url={{wd_mirror_server}}/

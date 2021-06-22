@@ -1,0 +1,39 @@
+---
+- name: Get CDH version of external manager
+  uri:
+    url: "{{cm_api_uri}}/clusters/"
+    user: admin
+    password: admin
+    return_content: yes
+  register: external_clusters
+
+- name: Fail if there are no existing clusters
+  fail:
+    msg: "Cluster not built on {{external_manager}} - this must be built before we can build this one"
+  when: external_clusters_count|int < 1
+  vars:
+    - external_clusters_count: "{{external_clusters.json['items']|length()}}"
+
+- name: Fail if the CDH version does not match
+  fail:
+    msg: "{{external_manager}} is using CDH {{external_version}}, not {{cdh_version}}"
+  when: external_version != cdh_version
+  vars:
+    - external_version: "{{external_clusters.json['items'].0.fullVersion}}"
+
+- name: Get CM config
+  uri:
+    url: "{{cm_api_uri}}/cm/config"
+    user: admin
+    password: admin
+    return_content: yes
+  register: external_cm
+
+- name: Fail if the external kerberos realm doesn't match
+  fail:
+    msg: "Kerberos Realms do not match, {{external_manager}} is '{{external_realm}}', we have '{{kerberos_server_realm_name}}'"
+  vars:
+    - external_realm: "{{external_cm.json['items']|json_query('[?name == `SECURITY_REALM`].value')|join('')}}"
+  when:
+    - is_running_security
+    - external_realm != kerberos_server_realm_name

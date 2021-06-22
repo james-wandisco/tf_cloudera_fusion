@@ -75,13 +75,22 @@
 #    - cm_agents
 #  tags: cm_agents
 
-- name: Install Kerberos client
-  hosts: cdh_servers
-  roles:
-    - kerberos_client
+#- name: Install Kerberos client
+#  hosts: cdh_servers
+#  roles:
+#    - kerberos_client
+#
+#- name: Install Kerberos server
+#  hosts: cdh_manager
+#  roles:
+#    - kerberos_server
 
-
-- name: Install Kerberos server
+- name: Install hive metastore server
   hosts: cdh_manager
   roles:
-    - kerberos_server
+    - hadoop_hive_metastore
+
+- name: Install hive server2
+  hosts: cdh_manager
+  roles:
+    - hadoop_hive_server2

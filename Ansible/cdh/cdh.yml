@@ -1,0 +1,229 @@
+---
+
+##
+## Common
+##
+
+
+- hosts: cdh-all
+  become: yes
+  become_user: root
+  become_method: sudo
+  any_errors_fatal: true
+  gather_facts: no
+  roles:
+    - cloudera-shared
+    - { role: cdh, when: not is_running_parcels }
+    - cloudera-manager-agent
+
+##
+## Cloudera manager
+##
+- hosts: cdh-all
+  become: yes
+  become_user: root
+  become_method: sudo
+  any_errors_fatal: true
+  gather_facts: no
+  roles:
+    - cloudera-manager-server-prep
+
+- hosts: cm
+  become: yes
+  become_user: root
+  become_method: sudo
+  any_errors_fatal: true
+  gather_facts: no
+  roles:
+    - cloudera-manager-server-deploy-parcel
+
+- hosts: cdh-all
+  become: yes
+  become_user: root
+  become_method: sudo
+  any_errors_fatal: true
+  gather_facts: no
+  roles:
+    - cloudera-manager-agent-start
+
+- hosts: cm
+  become: yes
+  become_user: root
+  become_method: sudo
+  any_errors_fatal: true
+  gather_facts: no
+  roles:
+    - cloudera-license
+    - cloudera-manager-server-complete
+
+##
+## Ambari
+##
+
+- hosts: ambari
+  become: yes
+  become_user: root
+  become_method: sudo
+  any_errors_fatal: true
+  gather_facts: yes
+  gather_subset:
+    - '!all'
+  roles:
+    - { role: ambari-stack, when: is_running_fusion }
+    - { role: ranger-prep, when: is_running_ranger }
+    - ambari-set-vars
+    - ambari-server-prep
+    - ambari-server-config-script
+
+- hosts: hdp-all
+  become: yes
+  become_user: root
+  become_method: sudo
+  any_errors_fatal: true
+  gather_facts: no
+  roles:
+    - ambari-check-agent
+
+- hosts: ambari
+  become: yes
+  become_user: root
+  become_method: sudo
+  any_errors_fatal: true
+  gather_facts: yes
+  gather_subset:
+    - '!all'
+  roles:
+    - ambari-start-services
+    - ambari-set-repos
+    - ambari-server
+    - { role: fix-ranger-password, when: is_running_ranger }
+
+- hosts: cm:ambari
+  become: yes
+  become_user: root
+  become_method: sudo
+  any_errors_fatal: true
+  gather_facts: no
+  roles:
+    - wait-for-cluster
+    - check-first-run
+
+- hosts: cm
+  become: yes
+  become_user: root
+  become_method: sudo
+  any_errors_fatal: true
+  gather_facts: no
+  roles:
+    - { role: start-flume, when: is_running_flume }
+    - { role: wait-for-cluster, when: is_running_flume }
+
+- hosts: ambari
+  become: yes
+  become_user: root
+  become_method: sudo
+  any_errors_fatal: true
+  gather_facts: yes
+  gather_subset:
+    - '!all'
+  roles:
+    - { role: ambari-restore, when: first_run_failed }
+    - { role: ranger-setup, when: is_running_ranger }
+    - ambari-remove-service-script
+
+- hosts: hdp-all
+  become: yes
+  become_user: root
+  become_method: sudo
+  any_errors_fatal: true
+  gather_facts: no
+  roles:
+    - ambari-agent-clean
+
+###
+### HDFS HA
+###
+- import_playbook: enable-ha.yml
+
+##
+## kerberos setup
+##
+- import_playbook: kerberos.yml
+
+- hosts: ambari
+  become: yes
+  become_user: root
+  become_method: sudo
+  any_errors_fatal: true
+  gather_facts: no
+  roles:
+    - { role: restart-ranger-admin, when: is_running_security and is_running_ranger_ha }
+    - { role: bigsql, when: is_running_bigsql }
+
+- hosts: hdp-all
+  become: yes
+  become_user: root
+  become_method: sudo
+  any_errors_fatal: true
+  gather_facts: no
+  roles:
+    - { role: datasunrise, when: is_running_bigsql }
+
+- hosts: ambari
+  become: yes
+  become_user: root
+  become_method: sudo
+  any_errors_fatal: true
+  gather_facts: no
+  roles:
+    - { role: restart-cluster, when: is_running_bigsql and is_running_security }
+
+##
+## solr install if sentry also enabled
+##
+- hosts: cm
+  become: yes
+  become_user: root
+  become_method: sudo
+  any_errors_fatal: true
+  gather_facts: no
+  roles:
+    - { role: wait-for-cluster, when: is_running_solr and is_running_sentry }
+    - { role: solr-sentry, when: is_running_solr and is_running_sentry }
+
+##
+## Manager TLS
+##
+- import_playbook: manager-tls.yml
+
+##
+## KMS
+##
+- import_playbook: kms.yml
+
+##
+## Set up mail handling for fusion hosts
+##
+- import_playbook: mailer.yml
+
+##
+## Set up SSL that fusion can use
+##
+- import_playbook: fusionssl.yml
+
+##
+## Fusion installation
+##
+
+- import_playbook: fusion.yml
+
+##
+## Create hdfs user dirs
+##
+
+- import_playbook: create-dirs.yml
+
+##
+## WANdisco Config Manager
+##
+- import_playbook: wd-config-manager.yml

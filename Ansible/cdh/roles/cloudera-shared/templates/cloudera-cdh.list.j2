@@ -1,0 +1,6 @@
+{% if cm_major_version|int >= 6 -%}
+deb [arch=amd64] {{cdh_repo_base}}/{{cdh_version}}/{{cm_repo_families[ansible_facts.distribution]}}{{ansible_facts.distribution_version|replace('.', '')}}/apt {{ansible_facts.distribution_release}}-cm{{cdh_version}} contrib
+{% else -%}
+deb [arch=amd64] {{cdh_repo_base}}/ubuntu/{{ansible_facts.distribution_release}}/amd64/cdh {{ansible_facts.distribution_release}}-cdh{{cdh_version}} contrib
+{% endif -%}
+deb [arch=amd64] https://archive.cloudera.com/kafka/ubuntu/xenial/amd64/kafka xenial-kafka3 contrib

@@ -1,0 +1,263 @@
+---
+- name: Update roleConfigGroup settings - HDFS
+  uri:
+    url: "{{cm_api_uri}}/clusters/{{ cdh_cluster_name }}/services/{{cdh_hdfs_service_name}}/roleConfigGroups/{{item.group}}/config"
+    user: admin
+    password: admin
+    method: PUT
+    body:
+      items: "{{item['items']}}"
+    body_format: json
+    return_content: yes
+    status_code: 200,204
+  register: hdfs_group_settings
+  loop_control:
+    label: "{{item.group}}"
+  loop:
+    - group: "{{cdh_hdfs_service_name}}-DATANODE-BASE"
+      items:
+        - name: dfs_data_dir_list
+          value: "{% for id in range(1, datanode_dir_count+1) %}/data/dfs/dnlocal/{{ id }}{% if not loop.last %},{% endif %}{% endfor %}"
+        - name: datanode_java_heapsize
+          value: "{{datanode_java_heapsize}}"
+        - name: dfs_datanode_max_locked_memory
+          value: "{{datanode_max_locked_memory}}"
+        - name: dfs_datanode_max_xcievers
+          value: "{{datanode_max_xcievers}}"
+        - name: dfs_datanode_failed_volumes_tolerated
+          value: 0
+    - group: "{{cdh_hdfs_service_name}}-NAMENODE-BASE"
+      items:
+        - name: dfs_name_dir_list
+          value: "/data/dfs/nn"
+        - name: namenode_java_heapsize
+          value: "{{namenode_java_heapsize}}"
+    - group: "{{cdh_hdfs_service_name}}-SECONDARYNAMENODE-BASE"
+      items:
+        - name: fs_checkpoint_dir_list
+          value: "/data/dfs/snn"
+        - name: secondary_namenode_java_heapsize
+          value: "{{secondary_namenode_java_heapsize}}"
+    - group: "{{cdh_hdfs_service_name}}-BALANCER-BASE"
+      items:
+        - name: balancer_java_heapsize
+          value: "{{balancer_java_heapsize}}"
+
+- debug: var=hdfs_group_settings
+  when: debug
+
+- name: Update roleConfigGroup settings - HDFS with Ranger SSL
+  uri:
+    url: "{{cm_api_uri}}/clusters/{{ cdh_cluster_name }}/services/{{cdh_hdfs_service_name}}/roleConfigGroups/{{item.group}}/config"
+    user: admin
+    password: admin
+    method: PUT
+    body:
+      items: "{{item['items']}}"
+    body_format: json
+    return_content: yes
+    status_code: 200,204
+  register: hdfs_group_settings
+  loop_control:
+    label: "{{item.group}}"
+  loop:
+    - group: "{{cdh_hdfs_service_name}}-NAMENODE-BASE"
+      items:
+        - name: namenode_truststore_file
+          value: /opt/wandisco/ssl/wandisco.ts
+        - name: namenode_truststore_password
+          value: wandisco
+    - group: "{{cdh_hdfs_service_name}}-HTTPFS-BASE"
+      items:
+        - name: httpfs_https_truststore_file
+          value: /opt/wandisco/ssl/wandisco.ts
+        - name: httpfs_https_truststore_password
+          value: wandisco
+  when: is_running_ranger_ssl
+
+- debug: var=hdfs_group_settings
+  when: debug
+
+- name: Update roleConfigGroup settings - YARN
+  uri:
+    url: "{{cm_api_uri}}/clusters/{{cdh_cluster_name}}/services/{{cdh_yarn_service_name}}/roleConfigGroups/{{item.group}}/config"
+    user: admin
+    password: admin
+    method: PUT
+    body:
+      items: "{{item['items']}}"
+    body_format: json
+    return_content: yes
+    status_code: 200,204
+  when: not is_running_mapreduce
+  register: yarn_group_settings
+  loop_control:
+    label: "{{item.group}}"
+  loop:
+    - group: "{{ cdh_yarn_service_name }}-NODEMANAGER-BASE"
+      items:
+        - name: yarn_nodemanager_local_dirs
+          value: "{% for id in range(1, datanode_dir_count+1) %}/data/yarn/nmlocal/{{ id }}{% if not loop.last %},{% endif %}{% endfor %}"
+        - name: yarn_nodemanager_log_dirs
+          value: "{% for id in range(1, datanode_dir_count+1) %}/data/yarn/nmlog/{{ id }}{% if not loop.last %},{% endif %}{% endfor %}"
+        - name: node_manager_java_heapsize
+          value: "{{node_manager_java_heapsize}}"
+        - name: yarn_nodemanager_resource_memory_mb
+          value: "{{yarn_container_memory}}"
+        - name: container_executor_min_user_id
+          value: 480
+    - group: "{{cdh_yarn_service_name}}-RESOURCEMANAGER-BASE"
+      items:
+        - name: resource_manager_java_heapsize
+          value: "{{resource_manager_java_heapsize}}"
+        - name: yarn_scheduler_maximum_allocation_mb
+          value: "{{yarn_container_memory_max}}"
+        - name: yarn_scheduler_minimum_allocation_mb
+          value: "{{yarn_container_memory_min}}"
+    - group: "{{cdh_yarn_service_name}}-GATEWAY-BASE"
+      items:
+        - name: mapreduce_map_memory_mb
+          value: "{{ mapred_map_memory }}"
+        - name: mapreduce_reduce_memory_mb
+          value: "{{ mapred_reduce_memory }}"
+        - name: yarn_app_mapreduce_am_resource_mb
+          value: "{{ mapred_am_memory }}"
+    - group: "{{cdh_yarn_service_name}}-JOBHISTORY-BASE"
+      items:
+        - name: mr2_jobhistory_java_heapsize
+          value: "{{mr2_jobhistory_java_heapsize}}"
+
+- name: Update roleConfigGroup settings - MRv1
+  uri:
+    url: "{{cm_api_uri}}/clusters/{{cdh_cluster_name}}/services/{{cdh_yarn_service_name}}/roleConfigGroups/{{item.group}}/config"
+    user: admin
+    password: admin
+    method: PUT
+    body:
+      items: "{{item['items']}}"
+    body_format: json
+    return_content: yes
+    status_code: 200,204
+  when: is_running_mapreduce
+  register: mrv1_group_settings
+  loop_control:
+    label: "{{item.group}}"
+  loop:
+    - group: "{{cdh_mapreduce_service_name}}-TASKTRACKER-BASE"
+      items:
+        - name: tasktracker_mapred_local_dir_list
+          value: "{% for id in range(1, datanode_dir_count+1) %}/data/mapred/ttlocal/{{ id }}{% if not loop.last %},{% endif %}{% endfor %}"
+    - group: "{{cdh_mapreduce_service_name}}-JOBTRACKER-BASE"
+      items:
+        - name: jobtracker_mapred_local_dir_list
+          value: "/data/mapred/jt"
+
+- debug: var=mrv1_group_settings
+  when: debug and is_running_mapreduce
+
+- name: Update roleConfigGroup settings - Ranger
+  uri:
+    url: "{{cm_api_uri}}/clusters/{{cdh_cluster_name}}/services/{{cdh_ranger_service_name}}/roleConfigGroups/{{item.group}}/config"
+    user: admin
+    password: admin
+    method: PUT
+    body:
+      items: "{{item['items']}}"
+    body_format: json
+    return_content: yes
+    status_code: 200,204
+  when: is_running_ranger and cdh_version is version("7.1.0", "<")
+  loop_control:
+    label: "{{item.group}}"
+  loop:
+    - group: "ranger-RANGER_ADMIN-BASE"
+      items:
+        - name: ranger_admin_max_heap_size
+          value: 400
+        - name: ranger_database_host
+          value: "{{cm_server_fqdn}}:7432"
+        - name: ranger_database_password
+          value: "{{rangerdbpass.stdout_lines.0}}"
+        - name: ranger_database_user
+          value: ranger
+    - group: "ranger-RANGER_TAGSYNC-BASE"
+      items:
+        - name: ranger_tagsync_max_heap_size
+          value: 400
+    - group: "ranger-RANGER_USERSYNC-BASE"
+      items:
+        - name: ranger_usersync_max_heap_size
+          value: 400
+
+- name: Set ranger-admin-site.xml
+  uri:
+    url: "{{cm_api_uri}}/clusters/{{cdh_cluster_name}}/services/{{cdh_ranger_service_name}}/roleConfigGroups/{{cdh_ranger_service_name}}-RANGER_ADMIN-BASE/config"
+    user: admin
+    password: admin
+    method: PUT
+    body:
+      items:
+        - name: conf/ranger-admin-site.xml_role_safety_valve
+          value: "{% if is_running_ranger_ssl -%}<property><name>ranger.service.https.attrib.keystore.keyalias</name><value>server</value></property>{% endif -%}{% if is_running_ranger_ha -%}<property><name>ranger.spnego.kerberos.keytab</name><value>/etc/security/keytabs/ranger.ha.keytab</value></property><property><name>ranger.spnego.kerberos.principal</name><value>*</value></property>{% endif -%}"
+    body_format: json
+    return_content: yes
+    status_code: 200,204
+  when: is_running_ranger
+
+- name: Update roleConfigGroup settings - Common Ranger SSL
+  uri:
+    url: "{{cm_api_uri}}/clusters/{{cdh_cluster_name}}/services/{{cdh_ranger_service_name}}/roleConfigGroups/{{cdh_ranger_service_name}}-{{item}}/config"
+    user: admin
+    password: admin
+    method: PUT
+    body:
+      items:
+        - name: ssl_client_truststore_location
+          value: /opt/wandisco/ssl/wandisco.ts
+        - name: ssl_client_truststore_password
+          value: wandisco
+    body_format: json
+    return_content: yes
+    status_code: 200,204
+  when: is_running_ranger and is_running_ranger_ssl
+  loop:
+    - RANGER_ADMIN-BASE
+    - RANGER_TAGSYNC-BASE
+    - RANGER_USERSYNC-BASE
+
+
+- name: Update roleConfigGroup settings - Tagsync/Admin Ranger SSL
+  uri:
+    url: "{{cm_api_uri}}/clusters/{{cdh_cluster_name}}/services/{{cdh_ranger_service_name}}/roleConfigGroups/{{cdh_ranger_service_name}}-{{item}}/config"
+    user: admin
+    password: admin
+    method: PUT
+    body:
+      items:
+        - name: ssl_server_keystore_location
+          value: /opt/wandisco/ssl/wandisco.ks
+        - name: ssl_server_keystore_password
+          value: wandisco
+        - name: ssl_enabled
+          value: true
+    body_format: json
+    return_content: yes
+    status_code: 200,204
+  when: is_running_ranger and is_running_ranger_ssl
+  loop:
+    - RANGER_ADMIN-BASE
+    - RANGER_TAGSYNC-BASE
+
+- name: Update roleConfigGroup settings - Zookeeper
+  uri:
+    url: "{{cm_api_uri}}/clusters/{{cdh_cluster_name}}/services/{{zookeeper_service_name}}/roleConfigGroups/{{zookeeper_service_name}}-SERVER-BASE/config"
+    user: admin
+    password: admin
+    method: PUT
+    body:
+      items:
+        - name: maxClientCnxns
+          value: 1500
+    body_format: json
+    status_code: 200,204
+  when: is_running_zookeeper or is_running_hbase or is_running_ha or is_running_yarn_ha or is_running_hive or is_running_solr or is_running_oozie

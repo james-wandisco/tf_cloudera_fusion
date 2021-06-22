@@ -1,0 +1,16 @@
+127.0.0.1   localhost localhost.localdomain localhost4 localhost4.localdomain4
+::1         localhost localhost.localdomain localhost6 localhost6.localdomain6
+#
+
+192.241.239.81      do-2
+162.243.136.105     do-11
+107.170.250.124     do-1
+198.199.101.50      do-10
+107.170.196.170     do-4
+192.241.237.66      do-9
+107.170.213.209     do-5
+104.131.157.44      do-6
+107.170.216.176     do-12
+162.243.146.46      do-3
+104.131.158.163     do-7
+104.131.156.240     do-8

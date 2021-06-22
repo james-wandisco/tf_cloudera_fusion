@@ -1,0 +1,3 @@
+#!/bin/bash
+[ -d /var/lock/subsys ] && rm -f /var/lock/subsys/*
+exit 0

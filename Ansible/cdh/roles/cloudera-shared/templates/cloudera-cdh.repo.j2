@@ -1,0 +1,12 @@
+[cloudera-cdh{{cdh_major_version}}]
+# Packages for Cloudera's Distribution for Hadoop, Version {{cdh_major_version}}, on RedHat	or CentOS {{ansible_facts.distribution}} x86_64
+name=Cloudera's Distribution for Hadoop, Version {{cdh_major_version}}
+baseurl=https://archive.cloudera.com/cdh{{cdh_major_version}}/{{cm_repo_families[ansible_facts.distribution]}}/{{ansible_facts.distribution_major_version}}/x86_64/cdh/{{cdh_version}}/
+gpgkey =https://archive.cloudera.com/cdh{{cdh_major_version}}/{{cm_repo_families[ansible_facts.distribution]}}/{{ansible_facts.distribution_major_version}}/x86_64/cdh/RPM-GPG-KEY-cloudera
+gpgcheck = 1
+
+[cloudera-kafka]
+name=Cloudera's Distribution for kafka, Version 3
+baseurl=http://archive.cloudera.com/kafka/{{cm_repo_families[ansible_facts.distribution]}}/{{ansible_facts.distribution_major_version}}/x86_64/kafka/3/
+gpgkey = http://archive.cloudera.com/kafka/{{cm_repo_families[ansible_facts.distribution]}}/{{ansible_facts.distribution_major_version}}/x86_64/kafka/RPM-GPG-KEY-cloudera
+gpgcheck = 1

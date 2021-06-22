@@ -1,0 +1,9 @@
+[Unit]
+Description=Service to resize the /run partition
+
+[Service]
+Type=oneshot
+ExecStart=/bin/mount -o remount,size=2G /run
+
+[Install]
+WantedBy=multi-user.target

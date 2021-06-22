@@ -1,0 +1,20 @@
+---
+#
+# install cloudera manager agent pkgs
+#
+- name: "install cloudera manager agent pkgs"
+  yum:
+    name:
+      - cloudera-manager-agent
+      - cloudera-manager-daemons
+    disablerepo: "{{ internal_repo_name }}"
+    state: present
+  notify: restart cloudera-scm-agent
+  register: yum_install
+  until: yum_install.rc|default(1) == 0
+  retries: 5
+  delay: 1
+  tags:
+    - deploy-cm-agent
+    - install-cloudera-manager-agent
+

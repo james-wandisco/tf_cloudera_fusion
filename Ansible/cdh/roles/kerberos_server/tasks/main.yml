@@ -5,14 +5,45 @@
     name: krb5-server
     state: installed
 
+- name: check if kerberos db exists
+  stat:
+    path: /var/kerberos/krb5kdc/principal
+  register: kerberos_db_exists
+
+- name: Print kerberos db status
+  debug:
+    msg: " I see that the exist status of kerberos db is {{ kerberos_db_exists.stat.exists }} "
+
+
+- name: Init kdb5_util create -s
+  command: kdb5_util create -s -P {{ kerberos_server_master_db_pass }}
+  become: yes
+  become_user: root
+  when: kerberos_db_exists.stat.exists == false
+
+- name: Create admin principal
+  command: /usr/sbin/kadmin.local -q "addprinc -pw hadoop hadoop/admin@{{kerberos_server_realm_name|upper()}}"
+
+- name: "Create fusionuser principals"
+  command: /usr/sbin/kadmin.local -q 'addprinc -randkey fusionuser/{{item}}'
+  loop: "{{groups.all}}"
+
+- name: "Create fusiouser keytab dir"
+  file: path=/opt/security/keytabs state=directory owner=root group=hadoop mode=0755
+
+- name: "Create fusionuser keytab"
+  command: /usr/sbin/kadmin.local -q 'xst -k /opt/security/keytabs/fusionuser.{{item}}.headless.keytab fusionuser/{{item}}' creates=/opt/security/keytabs/fusionuser.{{item}}.headless.keytab
+  loop: "{{groups.all}}"
+
+
 - name: Start krb5kdc
   service:
     name: krb5kdc
-    state: started
+    state: restarted
     enabled: yes
 
 - name: Start kadmin
   service:
     name: kadmin
-    state: started
+    state: restarted
     enabled: yes

@@ -1,0 +1,595 @@
+---
+- name: "start cloudera manager server"
+  service: name=cloudera-scm-server state=started enabled=yes
+  when: external_manager is not defined
+
+- name: "wait for cloudera-scm-server to be online"
+  wait_for: host={{cm_remote_server}} port={{cm_server_port}} timeout=600
+  tags:
+    - bare-cloudera
+
+### check if various services are already running/setup
+
+# check if DC cluster already exists
+- name: "check if CDH cluster already exists"
+  uri:
+    url={{cm_api_uri}}/clusters
+    user=admin
+    password=admin
+    status_code=200,204
+    return_content=yes
+  register: clusterstat
+  tags:
+    - check-cluster-created
+
+- name: "check if Cloudera Management Service already exists"
+  uri:
+    url={{cm_api_uri}}/cm/service
+    user=admin
+    password=admin
+    status_code=200,204,404
+    return_content=yes
+  register: cmsstat
+  tags:
+    - check-cluster-created
+    - deploy-local-parcel
+    - activate-local-parcel
+    - bare-cloudera-parcel
+
+- name: "check if Cloudera Management Service trial license is enabled"
+  uri:
+    url={{cm_api_uri}}/cm/license
+    user=admin
+    password=admin
+    status_code=200,204,404
+    return_content=yes
+  register: cmslicense
+
+- name: "check if Cloudera Management Service roles exit"
+  uri:
+    url={{cm_api_uri}}/cm/service/roles
+    user=admin
+    password=admin
+    status_code=200,204,404
+    return_content=yes
+  register: cmsroles
+
+- name: "check if cluster roles already exists"
+  uri:
+    url={{cm_api_uri}}/clusters/{{ cdh_cluster_name }}/services/{{ cdh_hdfs_service_name }}/roles
+    user=admin
+    password=admin
+    status_code=200,204,404
+    return_content=yes
+  register: rolesstat
+  tags:
+    - check-cluster-created
+
+##
+## Create Cluster
+##
+
+- name: debug var=cmslicense
+  debug: var=cmslicense
+  when: debug
+  tags:
+    - check-cluster-created
+
+- name: debug var=cmslicense.content
+  debug: var=cmslicense.content
+  when: debug
+  tags:
+    - check-cluster-created
+
+- name: "enable CM trial license"
+  uri:
+    url={{ cm_api_uri }}/cm/trial/begin
+    user=admin
+    password=admin
+    method=POST
+    status_code=200,204
+  when: (is_running_cmtrial) and ('Trial License' not in cmslicense.content)
+  tags:
+    - check-cluster-created
+
+- name: "copy deployment file to host"
+  template: src=json/{{ item.src }} dest=/var/tmp/{{ item.dest }} owner=root group=root mode=0644
+  loop_control:
+    label: "{{item.src}} -> {{item.dest}}"
+  loop:
+    - { src: 'cm-deployment.yml.j2', dest: 'cm-deployment.yml' }
+    - { src: 'hosts.yml.j2', dest: 'dc-hosts.yml' }
+  tags:
+    - check-cluster-created
+    - write-cluster-config
+
+- name: "Read in content of cm deployment yaml"
+  slurp: src=/var/tmp/cm-deployment.yml
+  register: cmdeployment
+  tags:
+    -bare-cloudera-parcel
+
+- name: Set java_home for all hosts, and some thresholds (CDH > 5.4)
+  uri:
+    url: "{{cm_api_uri}}/cm/allHosts/config"
+    user: admin
+    password: admin
+    force_basic_auth: yes
+    method: PUT
+    status_code: 200,202,204
+    body:
+      items:
+        - name: java_home
+          value: "{{java_home}}"
+        - name: host_agent_parcel_directory_free_space_absolute_thresholds
+          value: "{{parcel_thresholds|to_json}}"
+        - name: host_health_suppression_host_clock_offset
+          value: 'true'
+    body_format: json
+  when:
+    - external_manager is not defined
+    - cdh_version is version('5.5.0', '>=')
+    - "('MGMT' not in cmsstat.content) or ('\"name\" : \"%s\"'|format(cdh_cluster_name) not in clusterstat.content)"
+  vars:
+    parcel_thresholds:
+      warning: "{{host_agent_parcel_directory_free_space_warn}}"
+      critical: "{{host_agent_parcel_directory_free_space_crit}}"
+  tags:
+    -bare-cloudera-parcel
+
+- name: Set java_home for all hosts, and some thresholds (CDH < 5.4)
+  uri:
+    url: "{{cm_api_uri}}/cm/allHosts/config"
+    user: admin
+    password: admin
+    force_basic_auth: yes
+    method: PUT
+    status_code: 200,202,204
+    body:
+      items:
+        - name: java_home,
+          value: "{{java_home}}"
+        - name: host_agent_parcel_directory_free_space_absolute_thresholds
+          value: "{{parcel_thresholds|to_json}}"
+    body_format: json
+  when:
+    - external_manager is not defined
+    - cdh_version is version('5.4.11', '<=')
+    - "('MGMT' not in cmsstat.content) or ('\"name\" : \"%s\"'|format(cdh_cluster_name) not in clusterstat.content)"
+  vars:
+    parcel_thresholds:
+      warning: "{{host_agent_parcel_directory_free_space_warn}}"
+      critical: "{{host_agent_parcel_directory_free_space_crit}}"
+  tags:
+    -bare-cloudera-parcel
+
+- name: "create cluster"
+  uri:
+    url: "{{cm_api_uri}}/cm/deployment"
+    user: admin
+    password: admin
+    force_basic_auth: yes
+    method: PUT
+    status_code: 200,204
+    return_content: yes
+    body: "{{ cmdeployment.content|b64decode|from_yaml }}"
+    body_format: json
+  when: "('MGMT' not in cmsstat.content) or ('\"name\" : \"%s\"'|format(cdh_cluster_name) not in clusterstat.content)"
+  register: cdhcreate
+  tags:
+    -bare-cloudera-parcel
+
+- name: "debug var=cdhcreate"
+  debug: var=cdhcreate
+  when: debug
+  tags:
+    - check-cluster-created
+
+- name: "Configure Cloudera Management Service"
+  uri:
+    url={{cm_api_uri}}/cm/service/autoConfigure
+    user=admin
+    password=admin
+    force_basic_auth=yes
+    method=PUT
+    status_code=200,204
+    return_content=yes
+  when: "'COMMISSIONED' not in cmsroles.content"
+
+- name: "Configure CDH cluster roles and services"
+  uri:
+    url={{cm_api_uri}}/clusters/{{ cdh_cluster_name }}/autoConfigure
+    user=admin
+    password=admin
+    force_basic_auth=yes
+    method=PUT
+    status_code=200,204
+    return_content=yes
+  when: "'\"commissionState\" : \"COMMISSIONED\"' not in rolesstat.content"
+  tags:
+    - check-cluster-created
+
+- name: Configure Impala IMPALAD
+  uri:
+    url: "{{cm_api_uri}}/clusters/{{ cdh_cluster_name }}/services/{{cdh_impala_service_name}}/roleConfigGroups/{{cdh_impala_service_name}}-IMPALAD-BASE/config"
+    user: admin
+    password: admin
+    force_basic_auth: yes
+    method: PUT
+    body:
+      items:
+        - name: impalad_memory_limit
+          value: "{{namenode_java_heapsize}}"
+        - name: scratch_dirs
+          value: /impala/impalad
+        - name: rm_memory_hard_limit
+          value: "{{rm_hard_limit}}"
+        - name: rm_memory_soft_limit
+          value: "{{rm_soft_limit}}"
+    body_format: json
+    status_code: 200,204
+  when: "'\"commissionState\" : \"COMMISSIONED\"' not in rolesstat.content and is_running_impala"
+
+- name: Configure Impala IMPALAD - newer parameters
+  uri:
+    url: "{{cm_api_uri}}/clusters/{{ cdh_cluster_name }}/services/{{cdh_impala_service_name}}/roleConfigGroups/{{cdh_impala_service_name}}-IMPALAD-BASE/config"
+    user: admin
+    password: admin
+    force_basic_auth: yes
+    method: PUT
+    body:
+      items:
+        - name: impala_graceful_shutdown_deadline
+          value: "60"
+    body_format: json
+    status_code: 200,204
+  when:
+    - "'\"commissionState\" : \"COMMISSIONED\"' not in rolesstat.content"
+    - is_running_impala
+    - cdh_version is version('7.0.0', '>=')
+
+- name: Configure Impala STATESTORE
+  uri:
+    url: "{{cm_api_uri}}/clusters/{{ cdh_cluster_name }}/services/{{cdh_impala_service_name}}/roleConfigGroups/{{cdh_impala_service_name}}-STATESTORE-BASE/config"
+    user: admin
+    password: admin
+    force_basic_auth: yes
+    method: PUT
+    body:
+      items:
+        - name: rm_memory_hard_limit
+          value: "{{rm_hard_limit}}"
+        - name: rm_memory_soft_limit
+          value: "{{rm_soft_limit}}"
+    body_format: json
+    status_code: 200,204
+  when: "'\"commissionState\" : \"COMMISSIONED\"' not in rolesstat.content and is_running_impala"
+
+- name: Configure Impala CATALOGSERVER
+  uri:
+    url: "{{cm_api_uri}}/clusters/{{ cdh_cluster_name }}/services/{{cdh_impala_service_name}}/roleConfigGroups/{{cdh_impala_service_name}}-CATALOGSERVER-BASE/config"
+    user: admin
+    password: admin
+    force_basic_auth: yes
+    method: PUT
+    body:
+      items:
+        - name: catalogd_embedded_jvm_heapsize
+          value: "52428800"
+        - name: rm_memory_hard_limit
+          value: "{{rm_hard_limit}}"
+        - name: rm_memory_soft_limit
+          value: "{{rm_soft_limit}}"
+    body_format: json
+    status_code: 200,204
+  when: "'\"commissionState\" : \"COMMISSIONED\"' not in rolesstat.content and is_running_impala and cdh_version is version('5.7.0', '>=')"
+
+- name: Configure Impala LLAMA
+  uri:
+    url: "{{cm_api_uri}}/clusters/{{ cdh_cluster_name }}/services/{{cdh_impala_service_name}}/roleConfigGroups/{{cdh_impala_service_name}}-LLAMA-BASE/config"
+    user: admin
+    password: admin
+    force_basic_auth: yes
+    method: PUT
+    body:
+      items:
+        - name: rm_memory_hard_limit
+          value: "{{rm_hard_limit}}"
+        - name: rm_memory_soft_limit
+          value: "{{rm_soft_limit}}"
+    body_format: json
+    status_code: 200,204
+  when: "'\"commissionState\" : \"COMMISSIONED\"' not in rolesstat.content and is_running_impala and cdh_version is version('6', '<')"
+
+- name: Configure sqoop
+  uri:
+    url: "{{cm_api_uri}}/clusters/{{ cdh_cluster_name }}/services/{{cdh_sqoop_service_name}}/roleConfigGroups/{{cdh_sqoop_service_name}}-SQOOP_SERVER-BASE/config"
+    user: admin
+    password: admin
+    force_basic_auth: yes
+    method: PUT
+    body:
+      items:
+        - name: sqoop_java_heapsize
+          value: "52428800"
+        - name: sqoop_repository_database_password
+          value: sqoop
+    body_format: json
+    status_code: 200,204
+  when: "'\"commissionState\" : \"COMMISSIONED\"' not in rolesstat.content and is_running_sqoop and cdh_version is version('6.0', '<')"
+
+- name: Disable Hiveserver2 impersonation if running Sentry
+  uri:
+    url: "{{cm_api_uri}}/clusters/{{ cdh_cluster_name }}/services/{{cdh_hive_service_name}}/roleConfigGroups/{{cdh_hive_service_name}}-HIVESERVER2-BASE/config"
+    user: admin
+    password: admin
+    force_basic_auth: yes
+    method: PUT
+    body:
+      items:
+        - name: hiveserver2_enable_impersonation
+          value: 'false'
+    body_format: json
+    status_code: 200,204
+  when: "'\"commissionState\" : \"COMMISSIONED\"' not in rolesstat.content and is_running_hive and is_running_sentry"
+
+- name: Set Hiveserver2 Java heapsize
+  uri:
+    url: "{{cm_api_uri}}/clusters/{{ cdh_cluster_name }}/services/{{cdh_hive_service_name}}/roleConfigGroups/{{cdh_hive_service_name}}-HIVESERVER2-BASE/config"
+    user: admin
+    password: admin
+    force_basic_auth: yes
+    method: PUT
+    body:
+      items:
+        - name: hiveserver2_java_heapsize
+          value: "{{hiveserver2_java_heapsize}}"
+    body_format: json
+    status_code: 200,204
+  when: "'\"commissionState\" : \"COMMISSIONED\"' not in rolesstat.content and is_running_hive"
+
+- name: Set Hiveserver2 service discovery (if running zookeeper)
+  uri:
+    url: "{{cm_api_uri}}/clusters/{{ cdh_cluster_name }}/services/{{cdh_hive_service_name}}/roleConfigGroups/{{cdh_hive_service_name}}-HIVESERVER2-BASE/config"
+    user: admin
+    password: admin
+    force_basic_auth: yes
+    method: PUT
+    body:
+      items:
+        - name: hive_hs2_config_safety_valve
+          value: "<property>\n<name>hive.server2.support.dynamic.service.discovery</name>\n<value>true</value>\n</property>\n"
+    body_format: json
+    status_code: 200,204
+  when: "'\"commissionState\" : \"COMMISSIONED\"' not in rolesstat.content and is_running_hive and is_running_zookeeper"
+
+- name: Set Hiveserver2 spark cores (if running spark)
+  uri:
+    url: "{{cm_api_uri}}/clusters/{{ cdh_cluster_name }}/services/{{cdh_hive_service_name}}/roleConfigGroups/{{cdh_hive_service_name}}-HIVESERVER2-BASE/config"
+    user: admin
+    password: admin
+    force_basic_auth: yes
+    method: PUT
+    body:
+      items:
+        - name: hiveserver2_spark_executor_cores
+          value: 4
+    body_format: json
+    status_code: 200,204
+  when: "cm_major_version|int < 7 and '\"commissionState\" : \"COMMISSIONED\"' not in rolesstat.content and is_running_hive and is_running_spark"
+
+- name: Set Hive Metastore Java heapsize
+  uri:
+    url: "{{cm_api_uri}}/clusters/{{ cdh_cluster_name }}/services/{{cdh_hms_service_name}}/roleConfigGroups/{{cdh_hms_service_name}}-HIVEMETASTORE-BASE/config"
+    user: admin
+    password: admin
+    force_basic_auth: yes
+    method: PUT
+    body:
+      items:
+        - name: hive_metastore_java_heapsize
+          value: "{{hive_metastore_java_heapsize}}"
+    body_format: json
+    status_code: 200,204
+  when: "'\"commissionState\" : \"COMMISSIONED\"' not in rolesstat.content and is_running_hive"
+
+- name: Set Hive Metastore delegation token store (Hive HA)
+  uri:
+    url: "{{cm_api_uri}}/clusters/{{ cdh_cluster_name }}/services/{{cdh_hms_service_name}}/roleConfigGroups/{{cdh_hms_service_name}}-HIVEMETASTORE-BASE/config"
+    user: admin
+    password: admin
+    force_basic_auth: yes
+    method: PUT
+    body:
+      items:
+        - name: hive_metastore_delegation_token_store
+          value: org.apache.hadoop.hive.thrift.ZooKeeperTokenStore
+    body_format: json
+    status_code: 200,204
+  when: "'\"commissionState\" : \"COMMISSIONED\"' not in rolesstat.content and is_running_hive and is_running_hive_ha"
+
+- name: Enable Stored Notifications in Database (needed for Sentry)
+  uri:
+    url: "{{cm_api_uri}}/clusters/{{ cdh_cluster_name }}/services/{{cdh_hms_service_name}}/roleConfigGroups/{{cdh_hms_service_name}}-HIVEMETASTORE-BASE/config"
+    user: admin
+    password: admin
+    force_basic_auth: yes
+    method: PUT
+    body:
+      items:
+        - name: hive_enable_db_notification
+          value: "true"
+    body_format: json
+    status_code: 200,204
+  when: "'\"commissionState\" : \"COMMISSIONED\"' not in rolesstat.content and is_running_hive and is_running_sentry and cdh_version is version('5.8', '>=')"
+
+- name: Convert HBase heap sizes to bytes
+  set_fact:
+    hbase_master_heap: "{{(hbase_master_heap_mb|int) * 1024 * 1024}}"
+    hbase_regionserver_heap: "{{(hbase_regionserver_heap_mb|int) * 1024 * 1024}}"
+  when: "'\"commissionState\" : \"COMMISSIONED\"' not in rolesstat.content and is_running_hbase"
+
+- name: Show HBase heap sizes
+  debug: var={{item}}
+  loop:
+    - hbase_master_heap
+    - hbase_regionserver_heap
+  when: "'\"commissionState\" : \"COMMISSIONED\"' not in rolesstat.content and is_running_hbase and debug"
+
+- name: Set HBase Master Java heapsize
+  uri:
+    url: "{{cm_api_uri}}/clusters/{{ cdh_cluster_name }}/services/{{cdh_hbase_service_name}}/roleConfigGroups/{{cdh_hbase_service_name}}-MASTER-BASE/config"
+    user: admin
+    password: admin
+    force_basic_auth: yes
+    method: PUT
+    body:
+      items:
+        - name: hbase_master_java_heapsize
+          value: "{{hbase_master_heap}}"
+    body_format: json
+    status_code: 200,204
+  when: "'\"commissionState\" : \"COMMISSIONED\"' not in rolesstat.content and is_running_hbase"
+
+- name: Set HBase Master truststore (Ranger SSL)
+  uri:
+    url: "{{cm_api_uri}}/clusters/{{ cdh_cluster_name }}/services/{{cdh_hbase_service_name}}/roleConfigGroups/{{cdh_hbase_service_name}}-MASTER-BASE/config"
+    user: admin
+    password: admin
+    force_basic_auth: yes
+    method: PUT
+    body:
+      items:
+        - name: master_truststore_file
+          value: /opt/wandisco/ssl/wandisco.ts
+        - name: master_truststore_password
+          value: wandisco
+    body_format: json
+    status_code: 200,204
+  when: "'\"commissionState\" : \"COMMISSIONED\"' not in rolesstat.content and is_running_hbase and is_running_ranger_ssl"
+
+- name: Set HBase Regionserver Java heapsize
+  uri:
+    url: "{{cm_api_uri}}/clusters/{{ cdh_cluster_name }}/services/{{cdh_hbase_service_name}}/roleConfigGroups/{{cdh_hbase_service_name}}-REGIONSERVER-BASE/config"
+    user: admin
+    password: admin
+    force_basic_auth: yes
+    method: PUT
+    body:
+      items:
+        - name: hbase_regionserver_java_heapsize
+          value: "{{hbase_regionserver_heap}}"
+    body_format: json
+    status_code: 200,204
+  when: "'\"commissionState\" : \"COMMISSIONED\"' not in rolesstat.content and is_running_hbase"
+
+- name: Set HBase Regionserver truststore (Ranger SSL)
+  uri:
+    url: "{{cm_api_uri}}/clusters/{{ cdh_cluster_name }}/services/{{cdh_hbase_service_name}}/roleConfigGroups/{{cdh_hbase_service_name}}-REGIONSERVER-BASE/config"
+    user: admin
+    password: admin
+    force_basic_auth: yes
+    method: PUT
+    body:
+      items:
+        - name: regionserver_truststore_file
+          value: /opt/wandisco/ssl/wandisco.ts
+        - name: regionserver_truststore_password
+          value: wandisco
+    body_format: json
+    status_code: 200,204
+  when: "'\"commissionState\" : \"COMMISSIONED\"' not in rolesstat.content and is_running_hbase and is_running_ranger_ssl"
+
+- name: Configure oozie server default group
+  uri:
+    url: "{{cm_api_uri}}/clusters/{{ cdh_cluster_name }}/services/{{cdh_oozie_service_name}}/roleConfigGroups/{{cdh_oozie_service_name}}-OOZIE_SERVER-BASE/config"
+    user: admin
+    password: admin
+    force_basic_auth: yes
+    method: PUT
+    body:
+      items:
+        - name: oozie_database_host
+          value: "{{cm_server_fqdn}}:7432"
+        - name: oozie_database_name
+          value: oozie
+        - name: oozie_database_password
+          value: "{{ooziedbpass.stdout_lines.0}}"
+        - name: oozie_database_type
+          value: postgresql
+        - name: oozie_database_user
+          value: oozie
+    body_format: json
+    status_code: 200,204
+  when: "'\"commissionState\" : \"COMMISSIONED\"' not in rolesstat.content and is_running_oozie"
+
+- name: Configure oozie server default group (Ranger SSL)
+  uri:
+    url: "{{cm_api_uri}}/clusters/{{ cdh_cluster_name }}/services/{{cdh_oozie_service_name}}/roleConfigGroups/{{cdh_oozie_service_name}}-OOZIE_SERVER-BASE/config"
+    user: admin
+    password: admin
+    force_basic_auth: yes
+    method: PUT
+    body:
+      items:
+        - name: oozie_https_truststore_file
+          value: /opt/wandisco/ssl/wandisco.ts
+        - name: oozie_https_truststore_password
+          value: wandisco
+        - name: oozie_zookeeper_https_truststore_file
+          value: /opt/wandisco/ssl/wandisco.ts
+        - name: oozie_zookeeper_https_truststore_password
+          value: wandisco
+    body_format: json
+    status_code: 200,204
+  when: "'\"commissionState\" : \"COMMISSIONED\"' not in rolesstat.content and is_running_oozie and is_running_ranger_ssl"
+
+- include: config-groups.yml
+  tags:
+    - check-cluster-created
+
+## start parcel deployment
+#
+
+- name: "check if parcel already exists"
+  stat: path=/opt/cloudera/parcel-repo/CDH-{{ cdh_parcel_version }}-{{parcel_oscode}}.parcel
+  register: parcel_file
+  tags:
+    - create-cdh-cluster
+
+- name: "wait for parcel availability...checking status"
+  include_role: name=check-parcel-status
+  tags:
+    - create-cdh-cluster
+
+- name: "download parcel"
+  uri:
+    url={{cm_api_uri}}/clusters/{{ cdh_cluster_name }}/parcels/products/CDH/versions/{{ cdh_parcel_version }}/commands/startDownload
+    user=admin
+    password=admin
+    force_basic_auth=yes
+    method=POST
+    status_code=200
+    return_content=yes
+  when: is_running_parcels and parcelstatus.json.stage == "AVAILABLE_REMOTELY"
+  register: parceldownload
+  tags:
+    - create-cdh-cluster
+
+- name: "wait for parcel download to complete...checking status"
+  uri:
+    url={{cm_api_uri}}/clusters/{{ cdh_cluster_name }}/parcels/products/CDH/versions/{{ cdh_parcel_version }}
+    user=admin
+    password=admin
+    force_basic_auth=yes
+    method=GET
+    status_code=200,204
+    return_content=yes
+    timeout=120
+  register: parceldownloadstat
+  until: parceldownloadstat.json.stage == "DOWNLOADED"
+  retries: 180
+  delay: 10
+  when: is_running_parcels and parcelstatus.json.stage == "AVAILABLE_REMOTELY"
+  tags:
+    - create-cdh-cluster

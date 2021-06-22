@@ -1,0 +1,658 @@
+---
+#
+# {{ ansible_managed }}
+#
+{% if is_running_ranger %}
+{% set is_running_solr = true %}
+{% endif %}
+{% if is_running_hbase or is_running_ha or is_running_yarn_ha or is_running_hive or is_running_solr or is_running_oozie %}
+{% set is_running_zookeeper = true %}
+{% endif %}
+clusters:
+- name: {{ cdh_cluster_name }}
+  displayName: {{ cdh_cluster_name }}
+  version: {{ cdh_repo_version }}
+  fullVersion: {{ cdh_version }}
+  services:
+  - name: {{ cdh_hdfs_service_name }}
+    type: HDFS
+    config:
+      items:
+      - name: process_username
+        value: {{hdfs_user}}
+{% if is_running_sqoop and cdh_version is version('7.0', '>')  %}
+      - name: redaction_policy_enabled
+        value: {{redaction_policy_enabled}}
+{% endif %}
+{% if enable_acls or is_running_sentry %}
+      - name: dfs_namenode_acls_enabled
+        value: true
+{% endif %}
+{% if is_running_ranger %}
+      - name: enable_ranger_authorization
+        value: true
+{% if is_running_ranger_ssl %}
+      - name: ssl_client_truststore_location
+        value: /opt/wandisco/ssl/wandisco.ts
+      - name: ssl_client_truststore_password
+        value: wandisco
+{% endif %}
+{% if is_running_ranger_kms %}
+      - name: kms_service
+        value: {{cdh_ranger_kms_service_name}}
+{% endif %}
+{% endif %}{# end is_running_ranger #}
+{% if is_running_sentry and is_running_hive %}
+      - name: hdfs_sentry_sync_enable
+        value: true
+{% endif %}
+    roles:
+    - type: BALANCER
+      hostRef:
+        hostId: {{ namenode }}
+{% for host in slaves %}
+    - type: DATANODE
+      hostRef:
+        hostId: {{ host }}
+{% endfor %}
+
+{% if is_running_ha %}
+{% for host in journalnodes %}
+    - type: JOURNALNODE
+      config:
+        items:
+          - name: dfs_journalnode_edits_dir
+            value: /data/dfs/nnedits
+      hostRef:
+        hostId: {{ host }}
+{% endfor %}
+{% endif %}
+
+{% for host in all_dc_nodes %}
+    - type: GATEWAY
+      hostRef:
+        hostId: {{ host }}
+{% endfor %}
+    - type: NAMENODE
+      hostRef:
+        hostId: {{ namenode }}
+    - type: SECONDARYNAMENODE
+      hostRef:
+        hostId: {{ secondarynamenode }}
+    displayName: {{ cdh_hdfs_service_name }}
+
+{% if is_running_zookeeper %}
+  - name: {{zookeeper_service_name}}
+    type: ZOOKEEPER
+    roles:
+{% for host in zookeeper %}
+    - type: SERVER
+      hostRef:
+        hostId: {{ host }}
+{% endfor %}
+{% endif %}
+
+{% if is_running_hbase %}
+  - name: {{ cdh_hbase_service_name }}
+    type: HBASE
+    config:
+      items:
+      - name: hdfs_service
+        value: {{ cdh_hdfs_service_name }}
+      - name: zookeeper_service
+        value: {{zookeeper_service_name}}
+    roles:
+{% for host in hbase_master %}
+    - type: MASTER
+      hostRef:
+        hostId: {{ host }}
+{% endfor %}
+{% for host in all_dc_nodes %}
+    - type: GATEWAY
+      hostRef:
+        hostId: {{ host }}
+{% endfor %}
+{% for host in slaves %}
+    - type: REGIONSERVER
+      hostRef:
+        hostId: {{ host }}
+{% endfor %}
+{% endif %}
+#
+# Begin Oozie service config
+#
+{% if is_running_oozie %}
+  - name: {{ cdh_oozie_service_name }}
+    type: OOZIE
+    config:
+      items:
+      - name: mapreduce_yarn_service
+        value: {{ cdh_yarn_service_name }}
+      - name: zookeeper_service
+        value: {{ zookeeper_service_name }}
+{%  if is_running_hive %}
+      - name: hive_service
+        value: {{ cdh_hive_service_name }}
+{%  endif %}
+{%  if is_running_spark %}
+      - name: spark_on_yarn_service
+        value: {{cdh_spark_service_name}}
+{%  endif %}
+    roles:
+    - type: OOZIE_SERVER
+      hostRef:
+        hostId: {{ cm_server_fqdn }}
+{% endif %}
+
+{# Sentry and solr don't play nice so we have to enable solr later on if we're using them both #}
+{% if is_running_solr and not is_running_sentry %}
+  - name: {{ cdh_solr_service_name }}
+    type: SOLR
+    config:
+      items:
+      - name: hdfs_service
+        value: {{ cdh_hdfs_service_name }}
+      - name: zookeeper_service
+        value: {{ zookeeper_service_name }}
+{% if is_running_ranger %}
+      - name: enable_ranger_authorization
+        value: true
+{% if is_running_ranger_ssl %}
+      - name: solr_https_truststore_file
+        value: /opt/wandisco/ssl/wandisco.ts
+      - name: solr_https_truststore_password
+        value: wandisco
+{% endif %}
+{% endif %}
+    roles:
+    - type: SOLR_SERVER
+      hostRef:
+        hostId: {{ namenode }}
+{% endif %}{# end of is_running_solr #}
+
+{% if is_running_sqoop and cdh_version is version('6.0', '<')  %}
+  - name: {{ cdh_sqoop_service_name }}
+    type: SQOOP
+    config:
+      items:
+        - name: mapreduce_yarn_service
+          value: {{ cdh_yarn_service_name }}
+    roles:
+    - type: SQOOP_SERVER
+      hostRef:
+        hostId: {{ namenode }}
+{% endif %}{# end of is_running_sqoop #}
+
+{% if is_running_sqoop and cdh_version is version('6.0', '>=')  %}
+  - name: {{ cdh_sqoop_service_name }}
+    type: SQOOP_CLIENT
+    roles:
+{% for host in all_dc_nodes %}
+    - type: GATEWAY
+      hostRef:
+        hostId: {{ host }}
+{% endfor %}
+{% endif %}{# end of is_running_sqoop CDH 6+ #}
+
+{% if is_running_flume %}
+  - name: {{ cdh_flume_service_name }}
+    type: FLUME
+    roles:
+{% if flume_server is defined and flume_server|length %}
+{% for host in flume_server %}
+    - type: AGENT
+      hostRef:
+        hostId: {{ host }}
+{% endfor %}
+{% else %}
+    - type: AGENT
+      hostRef:
+        hostId: {{ cm_server_fqdn }}
+{% endif %}
+{% endif %}{# is_running_flume #}
+#
+# Begin Hive service config
+#
+{% if is_running_hive %}
+  - name: {{ cdh_hms_service_name }}
+    type: HIVE
+    config:
+      items:
+      - name: process_username
+        value: {{hive_user}}
+      - name: mapreduce_yarn_service
+        value: {{ cdh_yarn_service_name }}
+      - name: zookeeper_service
+        value: {{zookeeper_service_name}}
+      - name: hive_metastore_database_type
+        value: {{ hive_database }}
+      - name: hive_metastore_database_name
+        value: hive
+      - name: hive_metastore_database_password
+        value: {% if hive_database == 'postgresql' %}{{ hostvars[hive_server]['hivedbpass']['stdout'] }}{% else %}hivepass{% endif %}
+
+      - name: hive_metastore_database_host
+        value: {{ hive_server }}
+      - name: hive_metastore_database_port
+        value: {% if hive_database == 'postgresql' %}7432{% else %}3306{% endif %}
+
+{%  if is_running_hive_ha %}
+      - name: hive_service_config_safety_valve
+        value: "<property><name>hive.metastore.uris</name><value>{% for p in groups[percona_ha_group] %}thrift://{{p}}:9083{% if not loop.last %},{% endif %}{% endfor %}</value></property>"
+{%    set hive_group_name = percona_ha_group %}
+{%  else %}
+{%    set hive_group_name = hive_group %}
+{%  endif %}
+
+{% if is_running_ranger_ssl %}
+      - name: ssl_client_truststore_location
+        value: /opt/wandisco/ssl/wandisco.ts
+      - name: ssl_client_truststore_password
+        value: wandisco
+      - name: hiveserver2_truststore_file
+        value: /opt/wandisco/ssl/wandisco.ts
+      - name: hiveserver2_truststore_password
+        value: wandisco
+{% endif %}
+    roles:
+{%  for host in all_dc_nodes %}
+    - type: GATEWAY
+      hostRef:
+        hostId: {{ host }}
+{%  endfor %}
+{%  for host in groups[hive_group_name] %}
+    - type: HIVEMETASTORE
+      hostRef:
+        hostId: {{ host }}
+{% if not is_running_hive_on_tez %}
+    - type: HIVESERVER2
+      hostRef:
+        hostId: {{ host }}
+{% endif %}
+
+{%  endfor %}
+{% endif %} {# is_running_hive #}
+
+{% if is_running_hive_on_tez %}
+{% set is_running_tez = true %}
+  - name: {{ cdh_hive_service_name }}
+    type: HIVE_ON_TEZ
+    config:
+      items:
+      - name: process_username
+        value: {{hive_user}}
+      - name: mapreduce_yarn_service
+        value: {{ cdh_yarn_service_name }}
+      - name: zookeeper_service
+        value: {{zookeeper_service_name}}
+      - name: tez_service
+        value: {{cdh_tez_service_name}}
+{% if is_running_ranger_ssl %}
+      - name: hiveserver2_truststore_file
+        value: /opt/wandisco/ssl/wandisco.ts
+      - name: hiveserver2_truststore_password
+        value: wandisco
+{% endif %}
+    roles:
+{%  for host in all_dc_nodes %}
+    - type: GATEWAY
+      hostRef:
+        hostId: {{ host }}
+{%  endfor %}
+{%  for host in groups[hive_group_name] %}
+    - type: HIVESERVER2
+      hostRef:
+        hostId: {{ host }}
+{% endfor %}
+
+{% endif %} {# is_running_hive_on_tez #}
+
+{% if is_running_tez %}
+  - name: {{ cdh_tez_service_name }}
+    type: TEZ
+    config:
+      items:
+      - name: yarn_service
+        value: {{ cdh_yarn_service_name }}
+    roles:
+{%  for host in all_dc_nodes %}
+    - type: GATEWAY
+      hostRef:
+        hostId: {{ host }}
+{%  endfor %}
+{% endif %} {# is_running_tez #}
+
+{% if is_running_sentry %}
+  - name: {{ cdh_sentry_service_name }}
+    type: SENTRY
+    config:
+      items:
+        - name: hdfs_service
+          value: {{ cdh_hdfs_service_name }}
+        - name: sentry_server_database_host
+          value: {{ namenode }}
+        - name: sentry_server_database_password
+          value: {{ hostvars[namenode]['sentrydbpass']['stdout'] }}
+        - name: sentry_server_database_port
+          value: 7432
+        - name: sentry_server_database_type
+          value: postgresql
+    roles:
+    - type: SENTRY_SERVER
+      hostRef:
+        hostId: {{ namenode }}
+{% if cdh_version is version('5.7.0', '>=') %}
+{% for host in all_dc_nodes %}
+    - type: GATEWAY
+      hostRef:
+        hostId: {{ host }}
+{% endfor %}
+{% endif %}{# end of >= 5.7 #}
+{% endif %}
+
+{% if is_running_spark %}
+  - name: {{ cdh_spark_service_name }}
+    type: SPARK_ON_YARN
+    config:
+      items:
+      - name: yarn_service
+        value: {{ cdh_yarn_service_name }}
+    roles:
+{% for host in all_dc_nodes %}
+    - type: GATEWAY
+      hostRef:
+        hostId: {{ host }}
+{% endfor %}
+    - type: SPARK_YARN_HISTORY_SERVER
+      hostRef:
+        hostId: {{ namenode }}
+{% endif %}
+
+{% if is_running_impala %}
+  - name: {{ cdh_impala_service_name }}
+    type: IMPALA
+    config:
+      items:
+      - name: hdfs_service
+        value: {{ cdh_hdfs_service_name }}
+      - name: yarn_service
+        value: none
+      - name: hive_service
+        value: {{ cdh_hive_service_name }}
+{% if is_running_ranger_ssl %}
+      - name: impala_truststore_file
+        value: /opt/wandisco/ssl/wandisco.ts
+      - name: impala_truststore_password
+        value: wandisco
+{% endif %}
+    roles:
+{% for host in slaves %}
+    - type: IMPALAD
+      hostRef:
+        hostId: {{ host }}
+{% endfor %}
+    - type: STATESTORE
+      hostRef:
+        hostId: {{ namenode }}
+    - type: CATALOGSERVER
+      hostRef:
+        hostId: {{ namenode }}
+{% endif %}
+
+#
+# Begin PIG service config
+# No PIG service provided in CDH5
+#
+{% if is_running_pig %}
+{% endif %}
+#
+# Begin MrV1 or YARN services config
+#
+{% if is_running_mapreduce %}
+  - name: {{cdh_mapreduce_service_name}}
+    type: MAPREDUCE
+    config:
+      items:
+      - name: hdfs_service
+        value: {{ cdh_hdfs_service_name }}
+      - name: rm_dirty
+        value: 'true'
+    roles:
+    - type: JOBTRACKER
+      hostRef:
+        hostId: {{ resourcemanager }}
+{% for host in all_dc_nodes %}
+    - type: GATEWAY
+      hostRef:
+        hostId: {{ host }}
+{% endfor %}
+{% for host in slaves %}
+    - type: TASKTRACKER
+      hostRef:
+        hostId: {{ host }}
+{% endfor %}
+    displayName: {{cdh_mapreduce_service_name}}
+{% else %}
+# Being YARN service config
+  - name: {{ cdh_yarn_service_name }}
+    type: YARN
+    config:
+      items:
+      - name: hdfs_service
+        value: {{ cdh_hdfs_service_name }}
+      - name: rm_dirty
+        value: 'true'
+{% if is_running_ranger_ssl %}
+      - name: ssl_client_truststore_location
+        value: /opt/wandisco/ssl/wandisco.ts
+      - name: ssl_client_truststore_password
+        value: wandisco
+{% endif %}
+    roles:
+{% for host in all_dc_nodes %}
+    - type: GATEWAY
+      hostRef:
+        hostId: {{ host }}
+{% endfor %}
+    - type: JOBHISTORY
+      hostRef:
+        hostId: {{ historyserver }}
+{% for host in slaves %}
+    - type: NODEMANAGER
+      hostRef:
+        hostId: {{ host }}
+{% endfor %}
+    - type: RESOURCEMANAGER
+      hostRef:
+        hostId: {{ resourcemanager }}
+    displayName: {{ cdh_yarn_service_name }}
+{% endif %}
+
+{% if is_running_ranger %}
+# Begin Ranger config
+  - name: {{ cdh_ranger_service_name }}
+    type: RANGER
+    config:
+      items:
+      - name: hdfs_service
+        value: {{ cdh_hdfs_service_name }}
+      - name: keyadmin_user_password
+        value: {{ ranger_admin_password }}
+{% if cdh_version is version('7.1.0', '>=') %}
+      - name: ranger_database_host
+        value: {{ cm_server_fqdn }}
+      - name: ranger_database_password
+        value: {{ rangerdbpass.stdout_lines.0 }}
+      - name: ranger_database_port
+        value: 7432
+      - name: ranger_database_user
+        value: ranger
+{% endif %}
+      - name: rangeradmin_user_password
+        value: {{ ranger_admin_password }}
+      - name: rangertagsync_user_password
+        value: {{ ranger_admin_password }}
+      - name: rangerusersync_user_password
+        value: {{ ranger_admin_password }}
+      - name: solr_service
+        value: {{cdh_solr_service_name}}
+{% if is_running_ranger_ha %}
+      - name: load_balancer_url
+        value: {{ ranger_rest_url }}
+{% endif %}
+    roles:
+    - type: RANGER_USERSYNC
+      hostRef:
+        hostId: {{ cm_server_fqdn }}
+    - type: RANGER_TAGSYNC
+      hostRef:
+        hostId: {{ cm_server_fqdn }}
+{% if is_running_ranger_ha %}
+{% for host in [ranger_primary, ranger_secondary] %}
+    - type: RANGER_ADMIN
+      hostRef:
+        hostId: {{ host }}
+{% endfor %}
+{% else %}
+    - type: RANGER_ADMIN
+      hostRef:
+        hostId: {{ cm_server_fqdn }}
+{% endif %}{# is_running_ranger_ha #}
+{% endif %}{# is_running_ranger #}
+
+{% if is_running_ldp %}
+# Begin LDP config
+  - name: {{ cdh_ldp_service_name }}
+    type: FUSION
+    config:
+      items:
+        - name: hdfs_service
+          value: {{ cdh_hdfs_service_name }}
+        - name: zone
+          value: {{ fusion_zone_name }}
+    roles:
+{% for host in groups[fusion_group] %}
+    - type: FUSION_SERVER
+      hostRef:
+        hostId: {{ host }}
+    - type: FUSION_IHC_SERVER
+      hostRef:
+        hostId: {{ host }}
+{% endfor %}
+{% for host in all_dc_nodes %}
+    - type: GATEWAY
+      hostRef:
+        hostId: {{ host }}
+{% endfor %}
+{% endif %}{# is_running_ldp #}
+
+{% if external_manager is not defined %}
+#
+# Begin Cloudera Management Services Config
+#
+managementService:
+  name: mgmt
+  type: MGMT
+  config:
+    items:
+    - name: mgmt_embedded_database_free_space_absolute_thresholds
+      value: '{"warning":"1073741824","critical":"536870912"}'
+    - name: mgmt_navigator_health_enabled
+      value: 'false'
+    - name: mgmt_navigatormetaserver_health_enabled
+      value: 'false'
+    - name: mgmt_reportsmanager_health_enabled
+      value: 'false'
+  roles:
+  - type: ALERTPUBLISHER
+    hostRef:
+      hostId: {{ cm_alert_publisher }}
+  - type: EVENTSERVER
+    hostRef:
+      hostId: {{ cm_event_server }}
+  - type: HOSTMONITOR
+    hostRef:
+      hostId: {{ cm_host_monitor }}
+  - type: SERVICEMONITOR
+    hostRef:
+      hostId: {{ cm_service_monitor }}
+{% if is_running_cmtrial %}
+  - type: ACTIVITYMONITOR
+    hostRef:
+      hostId: {{ cm_activity_monitor }}
+  - type: NAVIGATOR
+    hostRef:
+      hostId: {{ cm_navigator }}
+  - type: NAVIGATORMETASERVER
+    hostRef:
+      hostId: {{ cm_navigator_metaserver }}
+  - type: REPORTSMANAGER
+    hostRef:
+      hostId: {{ cm_reports_manager }}
+{% endif %}
+  displayName: mgmt
+#
+# Begin Cloudera Management Service Settings
+#
+managerSettings:
+  items:
+  - name: CLUSTER_STATS_START
+    value: 10/24/2012 12:20
+  - name: PUBLIC_CLOUD_STATUS
+    value: NOT_ON_PUBLIC_CLOUD
+  - name: REMOTE_PARCEL_REPO_URLS
+    value: {{ cdh_parcel_repos }}
+hostTemplates:
+  items:
+  - name: {{ cm_gateway_template }}
+    clusterRef:
+      clusterName: {{ cdh_cluster_name }}
+    roleConfigGroupRefs:
+    - roleConfigGroupName: {{ cdh_hdfs_service_name }}-GATEWAY-BASE
+    - roleConfigGroupName: {{ cdh_hdfs_service_name }}-NAMENODE-BASE
+{% if is_running_mapreduce %}
+    - roleConfigGroupName: {{cdh_mapreduce_service_name}}-GATEWAY-BASE
+{% else %}
+    - roleConfigGroupName: {{ cdh_yarn_service_name }}-GATEWAY-BASE
+{% endif %}
+{% if is_running_hbase %}
+    - roleConfigGroupName: {{cdh_hbase_service_name}}-GATEWAY-BASE
+{% endif %}
+{% if is_running_hive %}
+    - roleConfigGroupName: {{ cdh_hms_service_name }}-GATEWAY-BASE
+    - roleConfigGroupName: {{ cdh_hms_service_name }}-HIVEMETASTORE-BASE
+{% if is_running_hive_on_tez %}
+    - roleConfigGroupName: {{ cdh_hive_service_name }}-GATEWAY-BASE
+    - roleConfigGroupName: {{ cdh_hive_service_name }}-HIVESERVER2-BASE
+{% else %}
+    - roleConfigGroupName: {{ cdh_hms_service_name }}-HIVESERVER2-BASE
+{% endif %}
+
+{% endif %}
+
+{% if is_running_tez %}
+    - roleConfigGroupName: {{cdh_tez_service_name}}-GATEWAY-BASE
+{% endif %}
+
+  - name: {{ cm_slave_template }}
+    clusterRef:
+      clusterName: {{ cdh_cluster_name }}
+    roleConfigGroupRefs:
+    - roleConfigGroupName: {{ cdh_hdfs_service_name }}-GATEWAY-BASE
+    - roleConfigGroupName: {{ cdh_hdfs_service_name }}-DATANODE-BASE
+{% if is_running_mapreduce %}
+    - roleConfigGroupName: {{cdh_mapreduce_service_name}}-GATEWAY-BASE
+    - roleConfigGroupName: {{cdh_mapreduce_service_name}}-TASKTRACKER-BASE
+{% else %}
+    - roleConfigGroupName: {{ cdh_yarn_service_name }}-GATEWAY-BASE
+    - roleConfigGroupName: {{ cdh_yarn_service_name }}-NODEMANAGER-BASE
+{% endif %}
+{% if is_running_hbase %}
+    - roleConfigGroupName: {{cdh_hbase_service_name}}-GATEWAY-BASE
+    - roleConfigGroupName: {{cdh_hbase_service_name}}-REGIONSERVER-BASE
+{% endif %}
+{% if is_running_impala %}
+    - roleConfigGroupName: {{cdh_impala_service_name}}-IMPALAD-BASE
+{% endif %}
+
+{% endif %} {# end external_manager #}

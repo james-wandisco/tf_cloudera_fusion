@@ -1,0 +1,5 @@
+[Wandisco-fusion]
+name=Wandisco Fusion
+baseurl=http://fusion-repo01.ashb.wandisco.com/fusion-internal-yum/rhel
+gpgcheck=0
+enabled=0

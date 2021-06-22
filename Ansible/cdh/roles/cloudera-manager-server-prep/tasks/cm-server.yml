@@ -1,0 +1,97 @@
+---
+- name: "Ensure Parcel repo has correct permissions"
+  file: path=/opt/cloudera/parcel-repo state=directory owner=cloudera-scm group=cloudera-scm recurse=yes
+
+- name: "Backup postgres configure script"
+  command: cp -a {{cmf_path}}/bin/initialize_embedded_db.sh /root/initialize_embedded_db.sh creates=/root/initialize_embedded_db.sh
+
+- name: "Check for original postgres configure script"
+  stat: path=/root/initialize_embedded_db.sh
+  register: init_db_st
+
+- name: "Restore original postgres configure script"
+  command: cp -a /root/initialize_embedded_db.sh {{cmf_path}}/bin/initialize_embedded_db.sh
+  when: init_db_st.stat.exists
+
+- name: "Configure postgres buffer size"
+  command: sed --in-place -e "/^get_shared_buffers/,/^}/c get_shared_buffers(){ echo shared_buffers={{ postgres_shared_buffers }}; }" {{cmf_path}}/bin/initialize_embedded_db.sh warn=no
+  when: postgres_shared_buffers is defined
+
+- name: "Configure Hive database user"
+  lineinfile:
+    path: "{{cmf_path}}/bin/initialize_embedded_db.sh"
+    line: create_mgmt_role_db HIVEMETASTORE hive
+    insertafter: create_mgmt_role_db NAVIGATORMETASERVER navms
+  when: is_running_hive
+
+- name: "Configure Sentry database user"
+  lineinfile:
+    path: "{{cmf_path}}/bin/initialize_embedded_db.sh"
+    line: create_mgmt_role_db SENTRYSERVER sentry
+    insertafter: create_mgmt_role_db NAVIGATORMETASERVER navms
+  when: is_running_sentry
+
+- name: "Configure Oozie database user"
+  lineinfile:
+    path: "{{cmf_path}}/bin/initialize_embedded_db.sh"
+    line: create_mgmt_role_db OOZIESERVER oozie
+    insertafter: create_mgmt_role_db NAVIGATORMETASERVER navms
+  when: is_running_oozie
+
+- name: "Configure Ranger database user"
+  lineinfile:
+    path: "{{cmf_path}}/bin/initialize_embedded_db.sh"
+    line: create_mgmt_role_db RANGERSERVER ranger
+    insertafter: create_mgmt_role_db NAVIGATORMETASERVER navms
+  when: is_running_ranger
+
+- name: "Configure Ranger KMS database user"
+  lineinfile:
+    path: "{{cmf_path}}/bin/initialize_embedded_db.sh"
+    line: create_mgmt_role_db RANGERKMSSERVER ranger_kms
+    insertafter: create_mgmt_role_db NAVIGATORMETASERVER navms
+  when: is_running_ranger_kms
+
+- name: "Ensure postgres run directory exists (sles)"
+  file: path=/var/run/postgresql owner=postgres group=postgres state=directory
+  when: ansible_facts.distribution == 'SLES'
+
+- name: "enable and start cloudera manager db"
+  service: name=cloudera-scm-server-db state=started enabled=yes pattern="/var/lib/cloudera-scm-server-db/data"
+
+- name: "fetch hive database password"
+  command: awk -F= '$1 == "com.cloudera.cmf.HIVEMETASTORE.db.password" {print $2}' /etc/cloudera-scm-server/db.mgmt.properties
+  register: hivedbpass
+
+- name: "fetch sentry database password"
+  command: awk -F= '$1 == "com.cloudera.cmf.SENTRYSERVER.db.password" {print $2}' /etc/cloudera-scm-server/db.mgmt.properties
+  register: sentrydbpass
+  when: is_running_sentry
+
+- name: "fetch oozie database password"
+  command: awk -F= '$1 == "com.cloudera.cmf.OOZIESERVER.db.password" {print $2}' /etc/cloudera-scm-server/db.mgmt.properties
+  register: ooziedbpass
+  when: is_running_oozie
+
+- name: "fetch ranger database password"
+  command: awk -F= '$1 == "com.cloudera.cmf.RANGERSERVER.db.password" {print $2}' /etc/cloudera-scm-server/db.mgmt.properties
+  register: rangerdbpass
+  when: is_running_ranger
+
+- name: "fetch ranger kms database password"
+  command: awk -F= '$1 == "com.cloudera.cmf.RANGERKMSSERVER.db.password" {print $2}' /etc/cloudera-scm-server/db.mgmt.properties
+  register: rangerkmsdbpass
+  when: is_running_ranger_kms
+
+- name: "Configure JAVA_HOME"
+  lineinfile: line='export JAVA_HOME={{java_home}}' regexp='export JAVA_HOME' path=/etc/default/cloudera-scm-server
+
+- name: "Set redaction policy"
+  lineinfile: line='export CMF_JAVA_OPTS="$CMF_JAVA_OPTS -Dcom.cloudera.api.redaction={{redaction_policy_enabled}}"' path=/etc/default/cloudera-scm-server
+  when: cdh_version is version('7.0.0', '>=')
+
+- name: "wait for cloudera-scm-server-db to start"
+  wait_for: host=localhost port=7432 delay=10
+
+- include: mysql.yml
+  when: is_running_hive and hive_database == 'mysql' and not is_running_hive_ha

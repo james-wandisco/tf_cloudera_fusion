@@ -1,0 +1,21 @@
+#
+# managed by ansible
+#
+#
+# Ansible syslogtags listed below
+#
+# ansible-command:
+# ansible-copy:
+# ansible-file:
+# ansible-fireball:
+# ansible-group:
+# ansible-lineinfile:
+# ansible-mount:
+# ansible-service:
+# ansible-setup:
+# ansible-user:
+# ansible-yum:
+#
+#
+
+if $syslogtag contains 'ansible-' then /var/log/ansible-plays.log

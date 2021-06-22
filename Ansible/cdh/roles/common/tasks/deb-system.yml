@@ -1,0 +1,22 @@
+---
+
+# double-check that time is synchronized ; 
+# if not synchronized, will cause problems with security (kerberos) or hbase;
+# stop/start ntpd and ntpdate
+- name: "stop ntpd"
+  service: name=ntp state=stopped enabled=yes
+
+- name: "run ntpdate"
+  command: ntpdate 0.ubuntu.pool.ntp.org
+
+- name: "start ntpd"
+  service: name=ntp state=started enabled=yes
+
+- name: "enable ssh"
+  service: name=ssh state=started enabled=yes
+
+- name: "disable syslog privilege drop - causes havok on CentOS 6 hosted containers"
+  replace: dest=/etc/rsyslog.conf regexp='^\$PrivDropTo.*'
+  notify: restart rsyslog 
+  tags:
+    - fix-rsyslog

@@ -1,0 +1,15 @@
+---
+- name: Show if we are disabling services
+  debug: msg="One or more of either SENTRY, FLUME or PIG have been disabled as they are deprecated in CDH 7+"
+  when: is_running_sentry or is_running_flume or is_running_pig
+
+- name: Disable deprecated services
+  set_fact:
+    is_running_sentry: false
+    is_running_flume: false
+    is_running_pig: false
+
+- name: Force Hive on Tez for CDH 7+
+  set_fact:
+    is_running_hive_on_tez: true
+  when: is_running_hive

@@ -1,0 +1,9 @@
+---
+
+- include: rh-pkgs.yml
+  when: ansible_facts.os_family == 'RedHat'
+
+- include: deb-pkgs.yml
+  when: ansible_facts.os_family == 'Debian'
+
+- include: cloudera-manager-agent.yml

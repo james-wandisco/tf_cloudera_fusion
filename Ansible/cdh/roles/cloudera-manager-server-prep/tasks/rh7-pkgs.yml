@@ -1,0 +1,21 @@
+---
+# use CM's embedded postgres db
+- name: "install cloudera manager server pkgs"
+  yum:
+    name:
+      - cloudera-manager-server-db-2
+      - cloudera-manager-server
+    disablerepo: "{{ internal_repo_name }}"
+    state: present
+  register: yum_install
+  until: yum_install.rc|default(1) == 0
+  retries: 5
+  delay: 1
+
+- name: "Install mariadb-server if using it for hive"
+  yum: name=mariadb-server disablerepo={{internal_repo_name}} state=present
+  when: not is_running_hive_ha and (inventory_hostname == cm_server_fqdn or inventory_hostname == hive_server) and is_running_hive and hive_database == 'mysql'
+
+- name: "Install mysql-connector-java if using it for hive"
+  yum: name=mysql-connector-java disablerepo={{internal_repo_name}} state=present
+  when: not oracle_jdk_major_version == "8" and (inventory_hostname == cm_server_fqdn or inventory_hostname == hive_server) and is_running_hive and hive_database == 'mysql'

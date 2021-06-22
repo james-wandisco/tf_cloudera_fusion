@@ -1,0 +1,282 @@
+---
+- name: "Add proxy for yum"
+  lineinfile: line="proxy=http://{{yum_proxy_server}}:3128" path=/etc/yum.conf
+  when: yum_proxy_server != ""
+
+- name: "rebuild rpmdb"
+  args:
+    warn: false
+  command: rpm --rebuilddb
+  tags:
+    - install-jdk
+
+- name: "set yum metadata_expire=6h"
+  ini_file: dest=/etc/yum.conf section=main option=metadata_expire value=6h owner=root group=root mode=0644 state=present backup=yes
+  tags:
+    - update-yum-conf
+
+- name: "Show duplicate packages in yum - non parcel Only"
+  ini_file: dest=/etc/yum.conf section=main option=showdupesfromrepos value=1 owner=root group=root mode=0644 state=present backup=yes
+  tags:
+    - update-yum-conf
+  when: not is_running_parcels
+
+- name: "deploy internal repo"
+  template: src={{ item }}.j2 dest=/etc/yum.repos.d/{{ item }} owner=root group=root mode=0644
+  loop:
+    - shdc.repo
+  tags:
+    - install-jdk
+
+- name: "deploy internal fusion repo"
+  copy: src=fusion.repo dest=/etc/yum.repos.d/fusion.repo owner=root group=root mode=0644
+  tags:
+    - install-fusion-repo
+
+- name: Ensure python-urllib3 is up to date (CMH)
+  yum: name=python-urllib3 state=latest
+  when: is_running_cmh
+
+# Ansible's yum module doesn't have the reinstall option
+- name: Reinstall python-urllib3 (CMH)
+  command: yum reinstall -y python-urllib3 warn=False
+  when: is_running_cmh
+
+- name: check if python-requests package is installed
+  command: rpm -q python-requests
+  ignore_errors: yes
+  register: rpm_python_requests
+  when: ansible_facts.distribution != 'RedHat' and ansible_facts.distribution_major_version != '7'
+
+- name: "Remove urllib3 and requests with pip - doesn't matter if it fails"
+  pip:
+    name:
+      - requests
+      - urllib3
+    state: absent
+  ignore_errors: yes
+  when: ansible_facts.distribution != 'RedHat' and ansible_facts.distribution_major_version != '7' and rpm_python_requests is failed
+
+- name: "removing packages"
+  yum:
+    name:
+      - java-1.6.0-openjdk
+      - java-1.7.0-openjdk
+      - jdk1.8.0_20
+    disablerepo: "{{ internal_repo_name }}"
+    state: removed
+  tags:
+    - remove-pkgs
+    - install-jdk
+
+- name: "check if epel6 rpm is present"
+  command: rpm -q {{epel_version}}
+  register: epel_check
+  when: ansible_facts.distribution_major_version == '6'
+  ignore_errors: yes
+  tags:
+    - install-epel
+
+##  command: rpm -ivh --force http://mirror.sfo12.us.leaseweb.net/epel/6/i386/epel-release-6-8.noarch.rpm
+- name: "install epel6 repos.d file"
+  yum: name={{ epel_location }} disablerepo='*' state=present
+  when: ansible_facts.distribution_major_version == '6' and epel_check is failed
+  tags:
+    - install-epel
+
+- name: "Yum clean to avoid caching problems"
+  command: yum clean all warn=False
+
+- name: "Register RHEL"
+  command: "subscription-manager {{ item }}"
+  loop:
+    - clean
+    - register --org=5856388 --activationkey=RHEL_Partner
+    - attach --auto
+  when: ansible_facts.lsb.id == 'RedHatEnterpriseServer'
+
+- name: "install os packages"
+  yum:
+    name:
+      - coreutils
+      - curl
+      - fuse
+      - fuse-libs
+      - git
+      - libselinux-python
+      - lsof
+      - man
+      - nc
+      - ntp
+      - ntpdate
+      - openssh
+      - openssh-clients
+      - openssh-server
+      - rsync
+      - screen
+      - sudo
+      - tmux
+      - tree
+      - unzip
+      - vim-common
+      - wget
+      - yum-plugin-priorities
+      - python-lxml
+      - PyYAML
+      - python-jinja2
+      - telnet
+      - initscripts
+      - xorg-x11-server-Xvfb
+    disablerepo: "{{ internal_repo_name }}"
+    state: present
+  register: yum_install
+  until: yum_install.rc|default(1) == 0
+  retries: 5
+  delay: 1
+
+- name: "install perf for non-Oracle systems"
+  yum:
+    name:
+      - perf
+    state: present
+  register: yum_install
+  until: yum_install.rc|default(1) == 0
+  retries: 5
+  delay: 1
+  when: ansible_facts.distribution != 'OracleLinux'
+
+- name: "Install openjdk"
+  yum:
+    name:
+      - java-{{openjdk_package_version}}-openjdk-headless
+      - java-{{openjdk_package_version}}-openjdk-devel
+    disablerepo: "{{ internal_repo_name }}"
+    state: present
+  register: yum_install
+  until: yum_install.rc|default(1) == 0
+  vars:
+    openjdk_package_version: "{% if (openjdk_version|int) == 8 %}1.8.0{% else %}{{openjdk_version}}{% endif %}"
+  when: use_openjdk
+  retries: 5
+  delay: 1
+
+- name: "Set openjdk keytool path"
+  set_fact:
+    keytool_path: /usr/bin/keytool
+  when: use_openjdk
+
+- name: "find openjdk java home"
+  command: readlink -f /usr/bin/keytool
+  register: keytool_abs_path
+  when: use_openjdk
+
+- name: "set openjdk java home"
+  set_fact:
+    java_home: "{{keytool_abs_path.stdout_lines.0|replace('/jre/bin/keytool','')}}"
+  when: use_openjdk
+
+- name: "Install latest firefox"
+  yum: name=firefox disablerepo={{ internal_repo_name }} state=latest
+  register: ff_install
+  until: ff_install.rc|default(1) == 0
+  retries: 5
+  delay: 1
+
+- name: "Fix up binary"
+  file: path=/usr/bin/firefox src=/usr/lib64/firefox/firefox state=link force=yes
+
+- name: "install centos6 only packages"
+  yum:
+    name:
+      - rsyslog
+      - python-argparse
+    disablerepo: "{{ internal_repo_name }}"
+    state: present
+  when: ansible_facts.distribution_major_version == '6'
+
+- name: "install centos7 only packages"
+  yum:
+    name:
+      - epel-release
+    disablerepo: "*"
+    enablerepo: extras
+    state: present
+  register: yum_install
+  until: yum_install.rc|default(1) == 0
+  retries: 5
+  delay: 1
+  when: ansible_facts.distribution_major_version == '7' and ansible_facts.distribution == 'CentOS'
+
+- name: "Ensure the latest openssl is installed"
+  yum: name=openssl disablerepo={{internal_repo_name}} state=latest
+  register: yum_install
+  until: yum_install.rc|default(1) == 0
+  retries: 5
+  delay: 1
+
+- name: "Remove mysql packages on centos7 - it's easier that way"
+  yum:
+    name:
+      - mysql57-community-release
+      - mysql-community-client
+      - mysql-community-server
+    disablerepo: "{{ internal_repo_name }}"
+    state: absent
+  register: yum_install
+  until: yum_install.rc|default(1) == 0
+  retries: 5
+  delay: 1
+  when: ansible_facts.distribution_major_version == '7'
+
+
+- name: "Install Oracle EPEL repo"
+  yum: name=oracle-epel-release-el7 state=present
+  when: ansible_facts.distribution == "OracleLinux" and ansible_facts.distribution_major_version == '7'
+
+- name: "installing misc pkgs"
+  yum:
+    name:
+      - ansible
+      - facter
+      - htop
+      - jq
+      - mc
+      - nano
+      - postgresql-jdbc
+    disablerepo: "{{ internal_repo_name }}"
+    state: present
+  register: yum_install
+  when: not (ansible_facts.distribution_major_version == '7' and ansible_facts.distribution == 'RedHat')
+  until: yum_install.rc|default(1) == 0
+  retries: 5
+  delay: 1
+
+- name: "installing pkgs for BI"
+  yum:
+    name:
+      - yum-utils
+      - ksh
+    disablerepo: "{{ internal_repo_name }}"
+    state: present
+  retries: 5
+  delay: 1
+
+- name: "installing pkgs for BigSQL"
+  yum:
+    name: unixODBC
+    state: latest
+    enablerepo: "{{ internal_repo_name }}"
+  retries: 5
+  delay: 1
+  when: is_running_bigsql
+
+- name: "Ensure /usr/lib/firefox exists"
+  file: path=/usr/lib/firefox state=directory owner=root group=root mode=0755
+
+- name: "fetch geckodriver tarball"
+  get_url:
+    url: http://mirror03.ashb.wandisco.com/geckodriver-v{{geckodriver_version}}-linux64.tar.gz
+    dest: /tmp
+
+- name: "extract geckodriver tarball"
+  unarchive: src=/tmp/geckodriver-v{{geckodriver_version}}-linux64.tar.gz dest=/usr/lib/firefox remote_src=yes

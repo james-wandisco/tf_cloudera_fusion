@@ -1,0 +1,10 @@
+---
+- name: "Install Cloudera Agent"
+  apt:
+    name:
+      - cloudera-manager-daemons
+      - cloudera-manager-agent
+    state: present
+  tags:
+    - deploy-cm-agent
+    - install-cloudera-manager-agent

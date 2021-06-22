@@ -1,0 +1,26 @@
+---
+
+- name: restart ntpd
+  action: service name=ntpd state=restarted
+
+- name: restart ntpdate
+  action: service name=ntpdate state=restarted
+
+- name: restart rebootnotify
+  action: service name=rebootnotify state=restarted
+
+- name: restart ambari-agent
+  action: service name=ambari-agent state=restarted
+
+- name: restart rsyslog
+  action: service name=rsyslog state=restarted
+
+- name: apply sysctl
+  action: command /sbin/sysctl -e -p
+  when: not skip_sysctl
+
+- name: restart crond
+  action: service name=crond state=restarted
+
+- name: restart journald
+  action: service name=systemd-journald state=restarted

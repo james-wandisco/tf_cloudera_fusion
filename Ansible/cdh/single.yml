@@ -1,16 +1,18 @@
 ---
 - name: hosts file change
-  hosts: cdh_manager
+  hosts: cdh_servers
   gather_facts: true
   become: true
   tasks:
-    - name: Disable transparent huge page - defrag
+    - name: Just a test
       shell: echo "hello"
     - name: "Build hosts file"
-      lineinfile:
+      blockinfile:
         dest: /etc/hosts
         regexp: '.*{{ item }}$'
-        line: "{{ hostvars[item]['ansible_default_ipv4']['address'] }} {{item}}"
+        #line: "{{ hostvars[item]['ansible_default_ipv4']['address'] }} {{item}}"
+        #line: "{{ hostvars[item]['ansible_default_ipv4']['address'] }} {{ hostvars[item]['ansible_hostname'] }} "
+        content: "{{ lookup('template', 'hosts.j2') }}"
         state: present
       when: hostvars[item]['ansible_default_ipv4']['address'] is defined
       with_items: '{{groups.all}}'

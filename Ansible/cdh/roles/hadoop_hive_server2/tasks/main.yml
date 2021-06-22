@@ -1,0 +1,11 @@
+---
+- name: install hive-server2
+  yum:
+    name:
+      - hive-server2
+    state: latest
+- name: start hive-server2
+  service:
+    name: hive-server2
+    enabled: true
+    state: started

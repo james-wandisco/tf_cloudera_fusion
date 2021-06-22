@@ -1,0 +1,41 @@
+---
+- name: Remove HDP repos if present (Suse 12, HDP 2.6.5.0)
+  file: path=/etc/zypp/repos.d/{{item}}.repo state=absent
+  loop:
+    - ambari
+    - HDP
+  when:
+    - ansible_facts.distribution_major_version == '12'
+    - is_running_hdp
+    - hdp_version == '2.6.5.0'
+
+- name: Install packages (Suse)
+  package:
+    name:
+      - mc
+      - postgresql-jdbc
+      - rsync
+      - rsyslog
+      - vim
+    state: present
+
+- name: Install PyYAML (Suse 11)
+  zypper:
+    name: 'http://osmirror.ashb.wandisco.com/internal/sles/11/x86_64/PyYAML-3.12-1.x86_64.rpm'
+    state: present
+  when: ansible_facts.distribution_major_version == '11'
+
+- name: Make sure the libcurl package is up to date (Suse 11)
+  zypper:
+    name: libcurl4
+    state: latest
+  when: ansible_facts.distribution_major_version == '11'
+
+- name: Install packages (Suse 12)
+  zypper:
+    name:
+      - python-PyYAML
+      - python
+    state: present
+    update_cache: yes
+  when: ansible_facts.distribution_major_version == '12'

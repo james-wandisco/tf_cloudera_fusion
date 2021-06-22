@@ -1,0 +1,33 @@
+---
+
+# ansible working directory
+
+- name: "ensure /var/lib/ansible directory is present"
+  file: path=/var/lib/ansible owner=root group=root mode=0755 state=directory
+  tags:
+    - install-ansible
+
+- name: "ensure /etc/ansible/facts.d directory is present"
+  file: path=/etc/ansible/facts.d owner=root group=root mode=0755 state=directory
+  tags:
+    - install-ansible
+
+- name: "ensure /etc/rsyslog.d directory is present for logging"
+  file: path=/etc/rsyslog.d owner=root group=root mode=0755 state=directory
+  tags:
+    - install-ansible
+
+- name: "configure rsyslog for ansible"
+  copy: src=ansible-plays.conf.rsyslog dest=/etc/rsyslog.d/ansible-plays.conf owner=root group=root mode=0644
+  notify:
+    - restart rsyslog
+  tags:
+    - install-ansible
+
+# setup log rotation for ansible
+
+- name: "creating log rotate entry for ansible logs"
+  copy: src=ansible.logrotate.d dest=/etc/logrotate.d/ansible owner=root group=root mode=0644
+  tags:
+    - install-ansible
+

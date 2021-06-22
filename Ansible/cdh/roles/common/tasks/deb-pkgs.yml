@@ -1,0 +1,71 @@
+---
+
+- name: "Update package cache"
+  apt: update_cache=yes
+
+- name: "Remove Java packages"
+  apt: name=openjdk* state=absent
+
+- name: "Install OS packages"
+  apt:
+    name:
+      - coreutils
+      - curl
+      - facter
+      - firefox
+      - fuse
+      - git
+      - "{{iproute}}"
+      - iptables
+      - lsof
+      - man
+      - mc
+      - nano
+      - ntp
+      - ntpdate
+      - python-httplib2
+      - python-jinja2
+      - python-lxml
+      - python-yaml
+      - rsync
+      - rsyslog
+      - screen
+      - ssh
+      - sudo
+      - tmux
+      - tree
+      - unzip
+      - vim-common
+      - wget
+      - xvfb
+      - htop
+      - facter
+    state: present
+  vars:
+    iproute: "iproute{% if ansible_facts.distribution_major_version != '12' %}2{% endif %}"
+
+- name: Install more modern packages
+  apt:
+    name:
+      - jq
+    state: present
+  when: not (ansible_facts.distribution == "Ubuntu" and ansible_facts.distribution_major_version == "12")
+
+- name: Install openjdk
+  apt:
+    name:
+      - openjdk-{{openjdk_version}}-jre-headless
+      - openjdk-{{openjdk_version}}-jdk-headless
+    state: present
+  when: use_openjdk
+
+- name: Find java home
+  command: readlink -f /usr/bin/keytool
+  register: keytool_abs_path
+  when: use_openjdk
+
+- name: Set java vars
+  set_fact:
+    keytool_path: /usr/bin/keytool
+    java_home: "{{keytool_abs_path.stdout_lines.0|replace('/jre/bin/keytool', '')}}"
+  when: use_openjdk

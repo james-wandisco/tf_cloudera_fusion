@@ -1,0 +1,90 @@
+---
+- name: "show hive_database"
+  debug: var=hive_database
+
+- name: "Check if we are a docker container"
+  stat: path=/.dockerenv
+  register: docker_check
+  tags:
+    - install-common
+    - install-ssh-key
+
+- include: docker.yml
+  when: docker_check.stat.exists
+  tags:
+    - install-common
+
+- include: set-repo.yml
+  when: wd_mirror_server is not defined and is_running_phd and ansible_facts.os_family == 'RedHat'
+  tags:
+    - install-common
+    - set-repo
+
+- include: check-repo.yml
+  when: is_running_phd and ansible_facts.os_family == 'RedHat'
+  tags:
+    - install-common
+    - set-repo
+
+- include: pre.yml
+  tags:
+    - install-common
+
+- include: accounts.yml
+  tags:
+    - install-common
+    - create-hadoop-accounts
+
+- include: rh-pkgs.yml
+  when: ansible_facts.os_family == 'RedHat'
+  tags:
+    - install-common
+    - install-pkgs
+
+- include: suse-pkgs.yml
+  when: ansible_facts.os_family == 'Suse'
+  tags:
+    - install-common
+    - install-pkgs
+
+- include: deb-pkgs.yml
+  when: ansible_facts.os_family == 'Debian'
+  tags:
+    - install-common
+    - install-pkgs
+
+- include: ansible.yml
+  when: ansible_facts.os_family == 'RedHat' and ansible_facts.distribution_major_version == '6'
+  tags:
+    - install-common
+
+- include: rh-system.yml
+  when: ansible_facts.os_family == 'RedHat'
+  tags:
+    - enable-services
+    - install-common
+
+- include: deb-system.yml
+  when: ansible_facts.os_family == 'Debian'
+  tags:
+    - enable-services
+    - install-common
+
+- include: suse-system.yml
+  when: ansible_facts.os_family == 'Suse'
+  tags:
+    - enable-services
+    - install-common
+
+- include: system-common.yml
+  tags:
+    - install-common
+
+- include: ssh.yml
+  tags:
+    - install-common
+
+- include: thp.yml
+  tags:
+    - install-common
+

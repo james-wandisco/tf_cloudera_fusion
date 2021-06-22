@@ -1,0 +1,11 @@
+---
+    - name: install hive-metastore
+      yum:
+        name:
+          - hive-metastore
+        state: latest
+    - name: start hive-metastore
+      service:
+        name: hive-metastore
+        enabled: true
+        state: started

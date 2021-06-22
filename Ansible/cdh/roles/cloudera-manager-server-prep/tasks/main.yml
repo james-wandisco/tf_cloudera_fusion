@@ -1,0 +1,22 @@
+---
+
+
+- include: rh7-pkgs.yml
+  when: ansible_facts.os_family == 'RedHat' and ansible_facts.distribution_major_version == '7' and (inventory_hostname == cm_server_fqdn or inventory_hostname == hive_server)
+  tags:
+    - install-cloudera-manager-server
+
+- include: cm-server.yml
+  when: inventory_hostname == cm_server_fqdn or inventory_hostname == hive_server
+  tags:
+    - install-cloudera-manager-server
+    - create-cluster
+    - create-cdh-cluster
+    - bare-cloudera
+
+- include: create-cdh-cluster.yml
+  when: inventory_hostname == cm_server_fqdn
+  tags:
+    - create-cluster
+    - create-cdh-cluster
+    - prep-cdh-cluster

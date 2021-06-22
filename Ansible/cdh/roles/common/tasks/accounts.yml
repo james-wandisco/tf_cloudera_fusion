@@ -1,0 +1,132 @@
+---
+
+- name: Check hadoop group
+  getent: database=group key=hadoop fail_key=no
+  tags:
+    - update-groups
+
+- name: "update group file"
+  group: name=hadoop gid=717 state=present
+  when: not getent_group.hadoop
+  tags:
+    - update-groups
+
+- name: "create yarn group (must be 723 for cloudera) - hdp will be skipped"
+  group: name=yarn state=present gid=723
+  when: is_running_parcels
+
+- name: "create hadoop related groups"
+  group: name={{ item }} state=present
+  loop:
+    - hdfs
+    - mapred
+    - zookeeper
+    - oozie
+    - hbase
+    - yarn
+    - hive
+    - hcat
+    - tez
+    - storm
+    - falcon
+    - httpfs
+  when: not is_running_iop
+
+- name: "create hadoop related groups (Ambari)"
+  group: name={{ item }} state=present
+  loop:
+    - nagios
+    - ambari-qa
+    - ambari
+  when: is_running_hdp
+
+- name: "create hadoop related groups (CDH)"
+  group: name={{ item }} state=present
+  loop:
+    - cloudera-scm
+    - cloudera-qa
+  when: is_running_cdh and not is_running_parcels
+
+- name: "create /home directory"
+  file: path=/home owner=root group=root mode=0755 state=directory
+  tags:
+    - create-home-dir
+
+- name: "create hadoop related users"
+  user: name={{ item.name }} comment={{ item.comment }} group={{ item.group }} home={{ item.home }} shell={{ item.shell }} createhome=yes state=present
+  loop_control:
+    label: "{{item.name}}"
+  loop:
+    - { name: 'hadoop', comment: 'hadoop', group: 'hadoop', home: '/home/hadoop/', shell: '/bin/bash' }
+    - { name: '{{hdfs_user}}', comment: 'hdfs', group: 'hdfs', home: '/var/lib/hadoop-hdfs', shell: '/bin/bash' }
+    - { name: 'mapred', comment: 'mapred', group: 'mapred', home: '/home/mapred', shell: '/bin/bash' }
+    - { name: 'zookeeper', comment: 'zookeeper', group: 'zookeeper', home: '/var/run/zookeeper', shell: '/sbin/nologin' }
+    - { name: 'oozie', comment: 'oozie', group: 'oozie', home: '/var/run/oozie', shell: '/bin/false' }
+    - { name: 'hbase', comment: 'hbase', group: 'hbase', home: '/home/hbase', shell: '/bin/bash' }
+    - { name: 'yarn', comment: 'yarn', group: 'yarn', home: '/home/yarn', shell: '/bin/bash' }
+    - { name: '{{hive_user}}', comment: 'hive', group: 'hive', home: '/home/{{hive_user}}', shell: '/bin/bash' }
+    - { name: 'hcat', comment: 'hcat', group: 'hcat', home: '/home/hcat', shell: '/bin/bash' }
+    - { name: 'tez', comment: 'tez', group: 'tez', home: '/home/tez', shell: '/bin/bash' }
+    - { name: 'storm', comment: 'storm', group: 'storm', home: '/home/storm', shell: '/bin/bash' }
+    - { name: 'falcon', comment: 'falcon', group: 'falcon', home: '/home/falcon', shell: '/bin/bash' }
+    - { name: 'httpfs', comment: 'Hadoop-HTTPFS', group: 'httpfs', home: '/var/run/hadoop-httpfs', shell: '/bin/bash' }
+  when: not is_running_iop
+
+- name: "create hadoop related users (Ambari)"
+  user: name={{ item.name }} comment={{ item.comment }} group={{ item.group }} home={{ item.home }} shell={{ item.shell }} createhome=yes state=present
+  loop_control:
+    label: "{{item.name}}"
+  loop:
+    - { name: 'nagios', comment: 'nagios', group: 'nagios', home: '/home/nagios', shell: '/bin/bash' }
+    - { name: 'ambari-qa', comment: 'ambari-qa', group: 'ambari-qa', home: '/home/ambari-qa', shell: '/bin/bash' }
+    - { name: 'ambari', comment: 'ambari', group: 'ambari', home: '/home/ambari', shell: '/bin/bash' }
+  when: is_running_hdp
+
+- name: "create hadoop related users (CDH)"
+  user: name={{ item.name }} comment={{ item.comment }} group={{ item.group }} home={{ item.home }} shell={{ item.shell }} createhome=yes state=present
+  loop_control:
+    label: "{{item.name}}"
+  loop:
+    - { name: 'cloudera-scm', comment: 'Cloudera-Manager', group: 'cloudera-scm', home: '/var/run/cloudera-scm-server', shell: '/sbin/nologin' }
+    - { name: 'cloudera-qa', comment: 'Cloudera-QA-User', group: 'cloudera-qa', home: '/home/cloudera-qa', shell: '/bin/bash' }
+  when: is_running_cdh and not is_running_parcels
+
+- name: "adding the hadoop related users to hadoop group"
+  user: name={{ item }} groups=hadoop
+  loop:
+    - '{{hdfs_user}}'
+    - mapred
+    - yarn
+    - zookeeper
+    - hbase
+    - '{{hive_user}}'
+    - oozie
+  when: not is_running_iop
+
+- name: "Look up {{hdfs_user}} user"
+  getent: database=passwd key={{hdfs_user}}
+
+- name: "Create ansible tmp directory for {{hdfs_user}}"
+  file: path={{getent_passwd[hdfs_user][4]}}/{{item}} state=directory owner={{hdfs_user}} mode=0750
+  loop:
+    - .ansible
+    - .ansible/tmp
+
+- name: "adding the cloudera-qa user to hadoop group"
+  user: name=cloudera-qa groups=hadoop
+  when: is_running_cdh
+
+- name: Add fusion user
+  user: name=fusionuser groups=hadoop shell=/bin/bash
+
+- name: Add vagrant user
+  user: name=vagrant shell=/bin/bash
+
+
+- name: Add fusion LFS group
+  group: name=fusion
+  when: is_running_localfs
+
+- name: Add fusion LFS user
+  user: name=fusion group=fusion shell=/bin/bash
+  when: is_running_localfs

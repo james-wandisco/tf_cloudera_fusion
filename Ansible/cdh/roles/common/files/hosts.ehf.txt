@@ -1,0 +1,21 @@
+#
+# managed by ansible
+#
+127.0.0.1   localhost localhost.localdomain localhost4 localhost4.localdomain4
+192.168.10.100 node-0
+192.168.10.101 node-1
+192.168.10.102 node-2
+192.168.10.103 node-3
+192.168.10.104 node-4
+192.168.10.105 node-5
+192.168.10.106 node-6
+192.168.10.107 node-7
+192.168.10.108 node-8
+192.168.10.109 node-9
+192.168.10.110 node-10
+192.168.10.111 node-11
+192.168.10.112 node-12
+#
+192.168.10.200 repo-0
+192.168.10.201 repo-1
+192.168.10.202 repo-2

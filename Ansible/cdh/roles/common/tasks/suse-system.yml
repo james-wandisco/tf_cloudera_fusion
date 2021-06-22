@@ -1,0 +1,59 @@
+---
+
+# double-check that time is synchronized ;
+# if not synchronized, will cause problems with security (kerberos) or hbase;
+# stop/start ntpd and ntpdate
+- name: "stop ntpdate and ntpd (SLES12)"
+  service: name={{ item }} state=stopped enabled=yes
+  when: ansible_facts.distribution_major_version == '12' and not skip_ntp
+  loop:
+    - ntpd
+
+- name: "stop ntpdate and ntpd (SLES11)"
+  service: name={{ item }} state=stopped enabled=yes
+  when: ansible_facts.distribution_major_version == '11' and not skip_ntp
+  loop:
+    - ntp
+
+- name: "run ntpdate"
+  command: ntpdate 0.pool.ntp.org
+
+- name: "Fix ntpd.service script for systemd"
+  lineinfile: path=/usr/lib/systemd/system/ntpd.service regexp='^ConditionVirtualization' state=absent
+  when: ansible_facts.distribution_major_version == '12'
+
+- name: "Reload systemd unit files"
+  command: systemctl daemon-reload
+  when: ansible_facts.distribution_major_version == '12'
+
+- name: "start ntpd (SLES12)"
+  service: name=ntpd state=started enabled=yes
+  when: ansible_facts.distribution_major_version == '12' and not skip_ntp
+
+- name: "start ntp (SLES11)"
+  service: name=ntp state=started enabled=yes
+  when: ansible_facts.distribution_major_version == '11' and not skip_ntp
+
+- name: "Enable syslog"
+  service: name=syslog state=started enabled=yes
+
+- name: "Fix [mysql] my.cnf"
+  ini_file: dest=/etc/my.cnf section=mysql option=default-character-set value=utf8mb4
+
+- name: "Fix [client] my.cnf"
+  ini_file: dest=/etc/my.cnf section=client option=default-character-set value=utf8mb4
+
+- name: "Fix [mysqld] my.cnf"
+  ini_file:
+    dest: /etc/my.cnf
+    section: mysqld
+    option: "{{item.name}}"
+    value: "{{item.value}}"
+    state: present
+  loop:
+    - { name: character-set-client-handshake, value: 0 }
+    - { name: character-set-server, value: utf8mb4 }
+    - { name: collation-server, value: utf8mb4_unicode_ci }
+    - { name: innodb_file_per_table, value: true }
+    - { name: innodb_file_format, value: BARRACUDA }
+    - { name: innodb_large_prefix, value: 1 }

@@ -1,0 +1,103 @@
+---
+
+- name: "check if service script is present"
+  stat: path=/etc/init.d/{{ item }}
+  loop:
+    - bluetooth
+    - iscsi
+    - iscsid
+    - certmonger
+    - cups
+    - gpm
+    - nrpe
+    - rhsmcertd
+    - rhnsd
+    - iptables
+    - ip6tables
+    - ganglia-monitor
+    - gmetad
+    - php7.0-fpm
+    - nscd
+  register: initdstat
+  tags:
+    - disable-services
+
+- name: "disable service if init.d script present"
+  service: name={{ item.item }} state=stopped enabled=no
+  loop: "{{initdstat.results}}"
+  loop_control:
+    label: "{{item['item']}}"
+  when: item.stat.exists is defined and item.stat.exists
+  ignore_errors: yes
+  tags:
+    - disable-services
+
+- name: "disable selinux"
+  command: /sbin/setenforce 0
+  when: ansible_facts.selinux == 'True'
+  tags:
+    - disable-services
+    - disable-selinux
+    - create-cluster
+
+- name: "disabling selinux using libselinux-python"
+  selinux: state=disabled
+  when: ansible_facts.selinux == 'True'
+  tags:
+    - disable-services
+    - disable-selinux
+    - create-cluster
+
+# We tag this with bare-cloudera so when we use that tag the common role is
+# triggered, so facts are gathered.  A little convoluted but such is life.
+- name: "copy system config templates"
+  template: src={{ item.src }}.j2 dest={{ item.dest }} owner={{ item.owner }} group={{ item.group }} mode={{ item.mode }} backup={{ item.backup }}
+  loop_control:
+    label: "{{item.dest}}"
+  loop:
+    - { src: 'java.sh', dest: '/etc/profile.d/java.sh', owner: 'root', group: 'root', mode: '0644', backup: 'no' }
+    - { src: 'java.csh', dest: '/etc/profile.d/java.csh', owner: 'root', group: 'root', mode: '0644', backup: 'no' }
+  tags:
+    - enable-services
+    - set-limits
+    - bare-cloudera
+    - bare-cloudera-parcel
+
+- name: "create dfs.datanode.data.dir directories - seq" 
+  file: path=/data/dfs/dnlocal/{{ item }} state=directory owner={{hdfs_user}} group=hadoop mode=0755
+  loop: "{{range(1, datanode_dir_count+1)|list}}"
+  tags:
+    - create-data-dirs
+
+- name: "create yarn.nodemanager.local-dirs directories - seq" 
+  file: path=/data/yarn/nmlocal/{{ item }} state=directory owner=yarn group=hadoop mode=0755
+  loop: "{{range(1, datanode_dir_count+1)|list}}"
+  tags:
+    - create-data-dirs
+
+- name: "set hostname to fqdn"
+  command: /bin/hostname --file /etc/hostname
+  when: set_hostnames_to_fqdn
+  tags:
+    - set-hostname
+
+- name: "Set net.ipv4.ip_local_port_range to prevent clients colliding with hadoop services"
+  lineinfile: dest=/etc/sysctl.conf line="net.ipv4.ip_local_port_range = 20000 50000"
+  when: not ansible_facts.os_family == 'Suse'
+  notify: apply sysctl
+  tags:
+    - set-limits
+
+- name: "Set kernel.shmmax to a sensible amount"
+  lineinfile: dest=/etc/sysctl.conf line="kernel.shmmax = 68719476736"
+  when: ansible_facts.os_family == 'Suse'
+  notify: apply sysctl
+
+- name: "systemd: Create journald.conf.d if necessary"
+  file: path=/etc/systemd/journald.conf.d state=directory
+  when: ansible_facts.service_mgr == "systemd"
+
+- name: "systemd: Don't log to /run/log"
+  copy: src=no_run_log.conf dest=/etc/systemd/journald.conf.d/no_run_log.conf
+  when: ansible_facts.service_mgr == "systemd"
+  notify: restart journald

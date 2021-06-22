@@ -1,0 +1,7 @@
+[{{ internal_repo_name }}]
+# internal repo for CentOS {{ansible_facts.distribution_major_version}} x86_64
+name={{ internal_repo_name }}
+baseurl=http://srepo01.shdc.wandisco.com/internal/CentOS/{{ansible_facts.distribution_major_version}}/
+gpgcheck=0
+enabled=0
+
