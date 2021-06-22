@@ -3,7 +3,7 @@
   when: cdh_version is version('7.0.0', '>=')
 
 - include: rh-shared.yml
-  when: ansible_facts.os_family == 'RedHat'
+  when: ansible_facts.ansible_os_family == 'RedHat'
   tags:
     - deploy-cm-agent
     - install-cloudera-manager-agent
@@ -12,16 +12,4 @@
     - deploy-cdh-repos
     - create-cluster
 
-- include: deb-shared.yml
-  when: ansible_facts.os_family == 'Debian'
-  tags:
-    - deploy-cm-agent
-    - install-cloudera-manager-agent
-    - install-cloudera-manager-server
-    - install-cdh
-    - deploy-cdh-repos
-    - create-cluster
-
-- include: deploy-internal-repos.yml
-  when: ansible_facts.os_family == 'RedHat' and ansible_facts.distribution_major_version == '6'
 
