@@ -1,0 +1,371 @@
+---
+
+# run on cloudera manager server
+
+- name: Fetch HDFS config
+  uri:
+    url: "{{cm_api_uri}}/clusters/{{cdh_cluster_name}}/services/{{cdh_hdfs_service_name}}/config"
+    user: admin
+    password: admin
+    return_content: yes
+  register: hdfs_config
+  until: hdfs_config.json is defined and 'items' in hdfs_config.json
+  retries: 10
+  delay: 3
+
+- name: "Set cluster_kerberos_enabled fact"
+  set_fact:
+    cluster_kerberos_enabled: "{{hdfs_config.json['items']|json_query('[?name == `hadoop_security_authorization`].value')|join('')|bool}}"
+
+- name: "check if kerberos realm already setup"
+  uri:
+    url: '{{cm_api_uri}}/cm/config'
+    user: admin
+    password: admin
+    status_code: 200,404
+    return_content: yes
+  register: realmstat
+  when: not cluster_kerberos_enabled
+
+- name: "debug var=realmstat"
+  debug: var=realmstat
+  when: debug and realmstat is defined
+
+- name: "Import admin credentials"
+  uri:
+    url: "{{cm_api_uri}}/cm/commands/importAdminCredentials?username={{kerberos_server_kadmin_user}}/admin@{{kerberos_server_realm_name|upper()}}&password={{kerberos_server_kadmin_pass}}"
+    user: admin
+    password: admin
+    method: POST
+    status_code: 200,202,204
+  when:
+    - not cluster_kerberos_enabled
+    - "kerberos_server_realm_name|upper() not in realmstat.content"
+
+
+- name: "set kerberos realm and KDC address"
+  uri:
+    url: "{{cm_api_uri}}/cm/config"
+    user: admin
+    password: admin
+    method: PUT
+    status_code: 200,204
+    return_content: yes
+    body: >-
+      {
+        "items": [
+          {
+            "name": "SECURITY_REALM",
+            "value": "{{kerberos_server_realm_name|upper()}}"
+          },
+          {
+            "name": "KDC_HOST",
+            "value": "{{kerberos_server_fqdn}}"
+          }
+        ]
+      }
+    body_format: json
+  when:
+    - not cluster_kerberos_enabled
+    - "kerberos_server_realm_name|upper() not in realmstat.content"
+  register: setrealm
+
+- name: "debug var=setrealm"
+  debug: var=setrealm
+  when: debug and setrealm is defined
+
+- name: "Wait for commands to finish (Cluster)"
+  uri:
+    url: '{{cm_api_uri}}/clusters/{{ cdh_cluster_name }}/commands/'
+    user: admin
+    password: admin
+    status_code: 200,204
+    return_content: yes
+  when: not cluster_kerberos_enabled
+  register: waitcluster
+  until: waitcluster.json is defined and 'items' in waitcluster.json and waitcluster.json['items'] == []
+  retries: 500
+  delay: 3
+
+- name: "Wait for commands to finish (CM)"
+  uri:
+    url: '{{cm_api_uri}}/cm/commands/'
+    user: admin
+    password: admin
+    status_code: 200,204
+    return_content: yes
+  when: not cluster_kerberos_enabled
+  register: waitcluster
+  until: waitcluster.json is defined and 'items' in waitcluster.json and waitcluster.json['items'] == []
+  retries: 500
+  delay: 3
+
+
+- name: "stop cluster"
+  uri:
+    url: '{{cm_api_uri}}/clusters/{{ cdh_cluster_name }}/commands/stop'
+    user: admin
+    password: admin
+    method: POST
+    status_code: 200,204
+    return_content: yes
+  when: not cluster_kerberos_enabled
+  register: cdhstopstat
+
+- name: "debug var=cdhstopstat"
+  debug: var=cdhstopstat
+  when: debug and cdhstopstat is defined
+
+- name: "stop cloudera manager service"
+  uri:
+    url: '{{cm_api_uri}}/cm/service/commands/stop'
+    user: admin
+    password: admin
+    method: POST
+    status_code: 200,204
+    return_content: yes
+  when: not cluster_kerberos_enabled
+  register: cmstopstat
+
+- name: "debug var=cmstopstat"
+  debug: var=cmstopstat
+  when: debug and cmstopstat is defined
+
+- name: "wait for cluster stop to complete before proceeding with next steps"
+  uri:
+    url: '{{cm_api_uri}}/commands/{{ cdhstopstat.json.id }}'
+    user: admin
+    password: admin
+    method: GET
+    status_code: 200,204
+    return_content: yes
+    timeout: 300
+  when: not cluster_kerberos_enabled
+  register: cdhstopdone
+  until: cdhstopdone.json is defined and cdhstopdone.json.success is defined and cdhstopdone.json.success and not cdhstopdone.json.active
+  retries: 30
+  delay: 10
+  failed_when: cdhstopdone.json is defined and cdhstopdone.json.success is defined and not cdhstopdone.json.success and not cdhstopdone.json.active
+
+- name: "wait for cloudera manager service stop to complete before proceeding with next steps"
+  uri:
+    url: '{{cm_api_uri}}/commands/{{ cmstopstat.json.id }}'
+    user: admin
+    password: admin
+    status_code: 200,204
+    return_content: yes
+    timeout: 180
+  when: not cluster_kerberos_enabled
+  register: cmstopdone
+  until: cmstopdone.json is defined and cmstopdone.json.success is defined and cmstopdone.json.success and not cmstopdone.json.active
+  retries: 18
+  delay: 10
+  failed_when: cmstopdone.json is defined and cmstopdone.json.success is defined and not cmstopdone.json.success and not cmstopdone.json.active
+
+- name: "update kerberos service settings"
+  uri:
+    url: '{{cm_api_uri}}/clusters/{{cluster}}/services/{{cdh_hdfs_service_name}}/config'
+    user: admin
+    password: admin
+    method: PUT
+    status_code: 200,204
+    return_content: yes
+    body_format: json
+    body: >-
+      {
+        "items": [
+          {
+            "name": "hadoop_security_authentication",
+            "value": "kerberos"
+          },
+          {
+            "name": "hadoop_security_authorization",
+            "value": "true"
+          },
+          {
+            "name": "kerberos_princ_name",
+            "value": "{{hdfs_user}}"
+          }
+        ]
+      }
+  register: krbservicesettings
+  when: not cluster_kerberos_enabled
+
+- name: "debug var=krbservicesettings"
+  debug: var=krbservicesettings
+  when: debug and krbservicesettings is defined
+
+- name: "update kerberos roleConfigGroup settings - DATANODE"
+  uri:
+    url: '{{cm_api_uri}}/clusters/{{cluster}}/services/{{cdh_hdfs_service_name}}/roleConfigGroups/{{cdh_hdfs_service_name}}-DATANODE-BASE/config'
+    user: admin
+    password: admin
+    method: PUT
+    status_code: 200,204
+    return_content: yes
+    body_format: json
+    body: >-
+      {
+        "items": [
+          {
+            "name": "dfs_datanode_port",
+            "value": "1004"
+          },
+          {
+            "name": "dfs_datanode_http_port",
+            "value": "1006"
+          },
+          {
+            "name": "dfs_datanode_data_dir_perm",
+            "value": "700"
+          }
+        ]
+      }
+  register: krbrolesettings
+  when: not cluster_kerberos_enabled
+
+- name: "debug var=krbrolesettings"
+  debug: var=krbrolesettings
+  when: debug and krbrolesettings is defined
+
+- name: "update kerberos roleConfigGroup settings - NODEMANAGER"
+  uri:
+    url: '{{cm_api_uri}}/clusters/{{cluster}}/services/{{cdh_yarn_service_name}}/roleConfigGroups/{{cdh_yarn_service_name}}-NODEMANAGER-BASE/config'
+    user: admin
+    password: admin
+    method: PUT
+    status_code: 200,204
+    return_content: yes
+    body_format: json
+    body: >-
+      {
+        "items": [
+          {
+            "name": "container_executor_min_user_id",
+            "value": "500"
+          }
+        ]
+      }
+  register: krbrolesettings
+  when: not cluster_kerberos_enabled
+
+- name: "debug var=krbrolesettings"
+  debug: var=krbrolesettings
+  when: debug and krbrolesettings is defined
+
+- name: Set Solr to use security
+  uri:
+    url: '{{cm_api_uri}}/clusters/{{cluster}}/services/{{cdh_solr_service_name}}/config'
+    user: admin
+    password: admin
+    method: PUT
+    status_code: 200,204
+    return_content: yes
+    body_format: json
+    body: '{"items":[{"name":"solr_security_authentication","value":"kerberos"}]}'
+  when:
+    - not cluster_kerberos_enabled
+    - (is_running_solr and not is_running_sentry) or is_running_ranger
+
+- name: Set Zookeeper to use security
+  uri:
+    url: '{{cm_api_uri}}/clusters/{{cluster}}/services/{{zookeeper_service_name}}/config'
+    user: admin
+    password: admin
+    method: PUT
+    status_code: 200,204
+    return_content: yes
+    body_format: json
+    body:
+      items:
+        - name: enableSecurity
+          value: true
+        - name: quorum_auth_enable_sasl
+          value: true
+  when:
+    - not cluster_kerberos_enabled
+    - is_running_hbase or is_running_ha or is_running_yarn_ha or is_running_hive or is_running_solr or is_running_ranger
+
+- name: Set HBase to use security
+  uri:
+    url: '{{cm_api_uri}}/clusters/{{cluster}}/services/{{cdh_hbase_service_name}}/config'
+    user: admin
+    password: admin
+    method: PUT
+    status_code: 200,204
+    return_content: yes
+    body_format: json
+    body: '{"items":[{"name":"hbase_security_authentication","value":"kerberos"},{"name":"hbase_security_authorization","value":"true"}]}'
+  when:
+    - not cluster_kerberos_enabled
+    - is_running_hbase
+
+- name: Set up Hive security
+  uri:
+    url: '{{cm_api_uri}}/clusters/{{cluster}}/services/{{cdh_hms_service_name}}/config'
+    user: admin
+    password: admin
+    method: PUT
+    status_code: 200,204
+    return_content: yes
+    body_format: json
+    body: '{"items":[{"name":"kerberos_princ_name","value":"{{hive_user}}"}]}'
+  when:
+    - not cluster_kerberos_enabled
+    - is_running_hive
+
+- name: Set up Hive on Tez security
+  uri:
+    url: '{{cm_api_uri}}/clusters/{{cluster}}/services/{{cdh_hive_service_name}}/config'
+    user: admin
+    password: admin
+    method: PUT
+    status_code: 200,204
+    return_content: yes
+    body_format: json
+    body: '{"items":[{"name":"kerberos_princ_name","value":"{{hive_user}}"}]}'
+  when:
+    - not cluster_kerberos_enabled
+    - is_running_hive
+    - is_running_hive_on_tez
+
+- name: "update kerberos roleConfigGroup settings - MRv1"
+  uri:
+    url: '{{cm_api_uri}}/clusters/{{cluster}}/services/{{cdh_mapreduce_service_name}}/roleConfigGroups/{{cdh_mapreduce_service_name}}-TASKTRACKER-BASE/config'
+    user: admin
+    password: admin
+    method: PUT
+    status_code: 200,204
+    return_content: yes
+    body_format: json
+    body: >-
+      {
+        "items": [
+          {
+            "name": "min_user_id",
+            "value": "500"
+          }
+        ]
+      }
+  when:
+    - not cluster_kerberos_enabled
+    - is_running_mapreduce
+  register: krbrolesettingsMRv1
+
+- name: "debug var=krbrolesettings"
+  debug: var=krbrolesettingsMRv1
+  when: debug and krbrolesettingsMRv1 is defined
+
+- name: "wait for commands to complete before proceeding with next steps"
+  uri:
+    url: '{{cm_api_uri}}/clusters/{{cluster}}/commands'
+    user: admin
+    password: admin
+    status_code: 200,204
+    return_content: yes
+    timeout: 180
+  when: not cluster_kerberos_enabled
+  register: gencreddone
+  until: gencreddone.json is defined and 'items' in gencreddone.json and gencreddone.json['items'] == []
+  retries: 18
+  delay: 10

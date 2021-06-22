@@ -1,0 +1,6 @@
+---
+- include: enable-kerberos.yml
+  tags:
+    - install-cdh-security
+    - install-security
+    - enable-cm-kerberos
