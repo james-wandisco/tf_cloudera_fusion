@@ -1,0 +1,27 @@
+[logging]
+ default = FILE:/var/log/krb5libs.log
+ kdc = FILE:/var/log/krb5kdc.log
+ admin_server = FILE:/var/log/kadmind.log
+
+[libdefaults]
+ default_realm = {{ kerberos_server_realm_name|upper() }}
+ default_ccache_name = FILE:%{TEMP}/krb5cc_%{uid}
+ dns_lookup_realm = false
+ dns_lookup_kdc = false
+ ticket_lifetime = 24h
+ renew_lifetime = 7d
+ forwardable = true
+ default_tkt_enctypes = arcfour-hmac-md5 des-cbc-crc des-cbc-md5
+ default_tgs_enctypes = arcfour-hmac-md5 des-cbc-crc des-cbc-md5
+
+[realms]
+ {{ kerberos_server_realm_name| upper() }} = {
+  kdc = {{ kerberos_server_fqdn }}
+  admin_server = {{ kerberos_server_fqdn }}
+ }
+
+[domain_realm]
+ .{{ kerberos_server_realm_name|lower() }} = {{ kerberos_server_realm_name|upper() }}
+  {{ kerberos_server_realm_name|lower() }} = {{ kerberos_server_realm_name|upper() }}
+ .{{ ansible_facts.domain|lower() }} = {{ kerberos_server_realm_name|upper() }}
+  {{ ansible_facts.domain|lower() }} = {{ kerberos_server_realm_name|upper() }}

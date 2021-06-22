@@ -1,0 +1,41 @@
+---
+- name: "Disable norandkey (Sles 11)"
+  set_fact:
+    norandkey: ""
+  when: ansible_facts.os_family == 'Suse' and ansible_facts.distribution_major_version == '11'
+
+- name: "install kerberos packages (RHEL)"
+  yum:
+    name:
+      - krb5-libs
+      - krb5-workstation
+      - cyrus-sasl-gssapi
+    state: present
+  when: ansible_facts.os_family == 'RedHat'
+  retries: 5
+  delay: 1
+
+- name: "install kerberos packages (Debian)"
+  apt: name=krb5-user state=present
+  when: ansible_facts.os_family == 'Debian'
+
+- name: "install kerberos packages (Sles)"
+  zypper: name=krb5-client state=present
+  when: ansible_facts.os_family == 'Suse'
+
+- name: "install client config file"
+  template: src=krb5.conf.j2 dest=/etc/krb5.conf owner=root group=root mode=0644
+
+- name: "Create symlink for ktutil and kadmin (Suse 11)"
+  file: path=/usr/bin/{{item}} src=/usr/lib/mit/sbin/{{item}} state=link
+  loop:
+    - ktutil
+    - kadmin
+  when: ansible_facts.os_family == 'Suse' and ansible_facts.distribution_major_version == '11'
+
+- name: "Create symlink for ktutil and kadmin (Suse 12)"
+  file: path=/usr/bin/{{item}} src=/usr/lib/mit/bin/{{item}} state=link
+  loop:
+    - ktutil
+    - kadmin
+  when: ansible_facts.os_family == 'Suse' and ansible_facts.distribution_major_version == '12'
