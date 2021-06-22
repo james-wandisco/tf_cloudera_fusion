@@ -1,0 +1,18 @@
+---
+kdc_config_directories:
+  Debian: /etc/krb5kdc
+  RedHat: /var/kerberos/krb5kdc
+  Suse: /var/lib/kerberos/krb5kdc
+
+kerberos_services:
+  RedHat:
+    - krb5kdc
+    - kadmin
+  Debian:
+    - krb5-kdc
+    - krb5-admin-server
+  Suse:
+    - krb5kdc
+    - kadmind
+
+kdb5_util_path: "{% if ansible_facts.os_family == 'Suse' %}/usr/lib/mit/sbin/kdb5_util{% else %}/usr/sbin/kdb5_util{% endif %}"

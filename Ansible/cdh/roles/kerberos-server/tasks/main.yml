@@ -1,0 +1,4 @@
+---
+
+- include: kerberos-server.yml tags=prep-security,prep-cdh-security,prep-hdp-security,install-security,install-kerberos-server
+

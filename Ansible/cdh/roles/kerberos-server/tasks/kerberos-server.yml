@@ -1,0 +1,95 @@
+---
+
+- name: "install kerberos packages (RHEL)"
+  yum:
+    name:
+      - krb5-server
+      - krb5-libs
+      - krb5-workstation
+    disablerepo: '{{ internal_repo_name }}'
+    state: present
+  when: ansible_facts.os_family == 'RedHat'
+  register: yum_install
+  until: yum_install.rc|default(1) == 0
+  retries: 5
+  delay: 1
+
+- name: "install kerberos packages (Debian)"
+  apt:
+    name:
+      - krb5-kdc
+      - krb5-admin-server
+      - dictionaries-common
+    state: present
+  when: ansible_facts.os_family == 'Debian'
+
+- name: "Fix krb5 systemd unit file (Debian)"
+  lineinfile: path=/lib/systemd/system/krb5-admin-server.service line='ReadWriteDirectories=-/var/tmp /tmp /var/lib/krb5kdc -/var/run /run /etc/krb5kdc' regexp='^ReadWriteDirectories' state=present
+  when: ansible_facts.os_family == 'Debian'
+
+- name: "install kerberos packages (Suse)"
+  zypper: name=krb5-server state=present
+  when: ansible_facts.os_family == 'Suse'
+
+- name: "set kdc config locations"
+  set_fact:
+    kdc_config_dir: "{{kdc_config_directories[ansible_facts.os_family]}}"
+
+- name: "install kdc config file"
+  template: src=kdc.conf.j2 dest={{kdc_config_dir}}/kdc.conf owner=root group=root mode=0644
+  notify: restart kerberos
+
+- name: "install kdc acl config file"
+  template: src=kadm5.acl.j2 dest={{kdc_config_dir}}/kadm5.acl owner=root group=root mode=0644
+  notify: restart kerberos
+
+- name: "link /dev/random to /dev/urandom"
+  file: path=/dev/random src=/dev/urandom state=link force=yes
+
+- name: "create initial kerberos db"
+  command: "{{kdb5_util_path}} create -s -P {{ kerberos_server_master_db_pass }} creates={{kdc_config_dir}}/principal"
+
+- name: "start kerberos services"
+  service: name={{ item }} state=started enabled=yes
+  loop: "{{kerberos_services[ansible_facts.os_family]}}"
+
+- name: "Symlink kadmin.local to somewhere more sensible (Sles)"
+  file: path=/usr/sbin/kadmin.local src=/usr/lib/mit/sbin/kadmin.local state=link
+  when: ansible_facts.os_family == 'Suse'
+
+- name: "list principals"
+  command: /usr/sbin/kadmin.local -q listprincs
+  register: kerberos_princs
+
+- name: "create admin for the kerberos db"
+  command: /usr/sbin/kadmin.local -q "addprinc -pw {{ kerberos_server_kadmin_pass }} {{ kerberos_server_kadmin_user }}/admin"
+  when: "'%s/admin@%s'|format(kerberos_server_kadmin_user, kerberos_server_realm_name|upper()) not in kerberos_princs.stdout_lines"
+
+- name: Create hadoop/admin principal
+  command: /usr/sbin/kadmin.local -q "addprinc -pw hadoop hadoop/admin@{{kerberos_server_realm_name|upper()}}"
+  when: "'hadoop/admin@%s'|format(kerberos_server_realm_name|upper()) not in kerberos_princs.stdout_lines"
+
+- name: "Create fusionuser principals"
+  command: /usr/sbin/kadmin.local -q 'addprinc -randkey fusionuser/{{item}}'
+  loop: "{{all_dc_nodes}}"
+  when: "'fusionuser/%s@%s'|format(item, kerberos_server_realm_name|upper()) not in kerberos_princs.stdout_lines"
+
+- name: "Create vagrant principals"
+  command: /usr/sbin/kadmin.local -q 'addprinc -randkey vagrant/{{item}}'
+  loop: "{{all_dc_nodes}}"
+  when: "'vagrant/%s@%s'|format(item, kerberos_server_realm_name|upper()) not in kerberos_princs.stdout_lines"
+
+- name: "Create fusiouser keytab dir"
+  file: path=/opt/security/keytabs state=directory owner=root group=hadoop mode=0755
+
+- name: "Create fusionuser keytab"
+  command: /usr/sbin/kadmin.local -q 'xst {{norandkey}} -k /opt/security/keytabs/fusionuser.{{item}}.headless.keytab fusionuser/{{item}}' creates=/opt/security/keytabs/fusionuser.{{item}}.headless.keytab
+  loop: "{{all_dc_nodes}}"
+
+- name: "Create vagrant keytab"
+  command: /usr/sbin/kadmin.local -q 'xst {{norandkey}} -k /opt/security/keytabs/vagrant.{{item}}.headless.keytab vagrant/{{item}}' creates=/opt/security/keytabs/vagrant.{{item}}.headless.keytab
+  loop: "{{all_dc_nodes}}"
+
+- name: "Ensure keytabs are readable"
+  file: path=/opt/security/keytabs/{{item[0]}}.{{item[1]}}.headless.keytab mode='0644'
+  loop: "{{['vagrant', 'fusionuser']|product(all_dc_nodes)|list}}"

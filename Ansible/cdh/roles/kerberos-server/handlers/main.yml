@@ -1,0 +1,5 @@
+---
+
+- name: restart kerberos
+  service: name={{ item }} state=restarted
+  loop: "{{kerberos_services[ansible_facts.os_family]}}"
