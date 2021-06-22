@@ -1,19 +1,4 @@
 ---
-  
-- name: "remove any hdp repo files if they exist"
-  file: path={{ item }} state=absent
-  loop:
-    - /etc/yum.repos.d/HDP.repo
-    - /etc/yum.repos.d/HDP-UTILS.repo
-    - /etc/yum.repos.d/ambari.repo
-    - /root/HDP.repo
-  tags:
-    - deploy-cm-agent
-    - install-cloudera-manager-agent
-    - install-cloudera-manager-server
-    - install-cdh
-    - deploy-cdh-repos
-    - create-cluster
 
 - name: "disable internal shdc repo to prevent timeouts while yum install of CDH is taking place"
   replace: dest=/etc/yum.repos.d/shdc.repo regexp='enabled=1' replace='enabled=0' backup=no
