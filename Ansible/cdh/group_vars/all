@@ -7,3 +7,6 @@ ansible_become: true
 tmp_dir: /tmp
 
 cm_repo_base: "http://mirror03.ashb.wandisco.com/cloudera-repos/{{cm_repo_version|lower}}"
+
+is_running_parcels: true
+is_not_running_parcels: false

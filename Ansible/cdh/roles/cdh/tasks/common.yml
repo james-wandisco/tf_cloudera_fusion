@@ -1,0 +1,54 @@
+---
+- name: "disable services since things are managed by CM - hdfs, yarn, mapreduce"
+  service: name={{ item }} enabled=no state=stopped
+  loop:
+    - hadoop-hdfs-datanode
+    - hadoop-hdfs-journalnode
+    - hadoop-hdfs-namenode
+    - hadoop-hdfs-secondarynamenode
+    - hadoop-hdfs-zkfc
+    - hadoop-httpfs
+    - hadoop-mapreduce-historyserver
+    - hadoop-yarn-nodemanager
+    - hadoop-yarn-proxyserver
+    - hadoop-yarn-resourcemanager
+  ignore_errors: true
+  tags:
+    - install-cdh
+    - disable-hadoop
+
+- name: "disable services since things are managed by CM - hbase"
+  service: name={{ item }} enabled=no state=stopped
+  loop:
+    - hbase-master
+    - hbase-regionserver
+    - hbase-rest
+    - hbase-thrift
+    - zookeeper-server
+  when: is_running_hbase
+  ignore_errors: true
+  tags:
+    - install-cdh
+    - disable-hbase
+
+- name: "disable services since things are managed by CM - oozie"
+  service: name={{ item }} enabled=no state=stopped
+  loop:
+    - oozie
+  when: is_running_oozie
+  ignore_errors: true
+  tags:
+    - install-cdh
+    - disable-oozie
+
+- name: "disable services since things are managed by CM - hive"
+  service: name={{ item }} enabled=no state=stopped
+  loop:
+    - hive-metastore
+    - hive-server2
+    - hive-webhcat-server
+  when: is_running_hive
+  ignore_errors: true
+  tags:
+    - install-cdh
+    - disable-hive

@@ -1,0 +1,104 @@
+---
+cm_group: "{{['cm', cluster]|join('-')}}"
+cm_ap_group: "{{['cm-alert-publisher', cluster]|join('-')}}"
+cm_es_group: "{{['cm-event-server', cluster]|join('-')}}"
+cm_hm_group: "{{['cm-host-monitor', cluster]|join('-')}}"
+cm_sm_group: "{{['cm-service-monitor', cluster]|join('-')}}"
+cm_am_group: "{{['cm-activity-monitor', cluster]|join('-')}}"
+cm_nav_group: "{{['cm-navigator', cluster]|join('-')}}"
+cm_navm_group: "{{['cm-navigator-metaserver', cluster]|join('-')}}"
+cm_repm_group: "{{['cm-reports-manager', cluster]|join('-')}}"
+
+
+cm_server_fqdn: "{{ groups[cm_group][0] }}"
+cm_remote_server: "{% if external_manager is defined %}{{external_manager}}{% else %}{{cm_server_fqdn}}{% endif %}"
+cm_server_port: "718{% if has_manager_tls %}3{% else %}0{% endif %}"
+cm_server_ssl_port: 7183
+cm_server_scheme: "http{% if has_manager_tls %}s{% endif %}"
+cm_major_version: "{{cm_version|regex_replace('^(\\d+).*', '\\1')|int}}"
+cm_repo_version: "CM{{cm_major_version}}"
+cm_repo_base: "http://mirror03.ashb.wandisco.com/cloudera-repos/{{cm_repo_version|lower}}"
+cdh_major_version: "{{cdh_version|regex_replace('^(\\d+).*', '\\1')}}"
+cdh_repo_version: "CDH{{cdh_major_version}}"
+cdh_repo_base: "http://mirror03.ashb.wandisco.com/cloudera-repos/cdh{{cdh_major_version}}"
+cm_api_version: "v{% if cdh_version is version('5.13.0', '>=') %}18{% else %}7{% endif %}"
+cdh_version: 5.1.3
+cm_version: "{% if cdh_version == '5.4.2' %}5.4.1{% else %}{{cdh_version}}{% endif %}"
+cdh_parcel_version: 5.1.3-1.cdh5.1.3.p0.12
+cdh_cluster_name: "{{ cluster }}"
+cdh_service_number: "{% if external_manager is defined %}{{dc}}{% else %}1{% endif %}"
+cdh_hdfs_service_name: hdfs{{cdh_service_number}}
+cdh_yarn_service_name: yarn{{cdh_service_number}}
+cdh_hive_service_name: "{% if is_running_hive_on_tez %}hive_on_tez{% else %}hive{% endif %}{{cdh_service_number}}"
+cdh_hms_service_name: hive{{cdh_service_number}}
+cdh_oozie_service_name: oozie{{cdh_service_number}}
+cdh_sentry_service_name: sentry{{cdh_service_number}}
+zookeeper_service_name: zookeeper{{cdh_service_number}}
+cdh_hbase_service_name: hbase{{cdh_service_number}}
+cdh_solr_service_name: "{% if external_manager is defined %}solr{{cdh_service_number}}{% else %}solr{% endif %}"
+cdh_sqoop_service_name: "{% if external_manager is defined %}sqoop{{cdh_service_number}}{% elif cdh_version is version('6.0', '>=') %}sqoop_client{% else %}sqoop{% endif %}"
+cdh_flume_service_name: flume{{cdh_service_number}}
+cdh_tez_service_name: "{% if external_manager is defined %}tez{{cdh_service_number}}{% else %}tez{% endif %}"
+cdh_spark_service_name: "{% if external_manager is defined %}spark{{cdh_service_number}}{% else %}spark_on_yarn{% endif %}"
+cdh_impala_service_name: "{% if external_manager is defined %}impala{{cdh_service_number}}{% else %}impala{% endif %}"
+cdh_ranger_service_name: "{% if external_manager is defined %}ranger{{cdh_service_number}}{% else %}ranger{% endif %}"
+cdh_ranger_kms_service_name: ranger_kms{{cdh_service_number}}
+cdh_kms_service_name: kms{{cdh_service_number}}
+cdh_mapreduce_service_name: mapreduce{{cdh_service_number}}
+
+
+is_running_cdh: true
+is_running_localfs: false
+
+rm_hard_limit: 1024
+rm_soft_limit: 1024
+
+manager_server: "{{cm_server_fqdn}}"
+manager_type: CLOUDERA
+manager_port: "{{cm_server_port}}"
+manager_ssl_port: "{{cm_server_ssl_port}}"
+
+cm_repo_families:
+  CentOS: redhat
+  RedHat: redhat
+  OracleLinux: redhat
+  Ubuntu: ubuntu
+  SLES: sles
+
+is_cm: "cm_group in group_names"
+nsnn_nodes: "{{ groups[nsnn_nodes_group] }}"
+cm_alert_publisher: "{{ groups[cm_ap_group][0] }}"
+cm_event_server: "{{ groups[cm_es_group][0] }}"
+cm_host_monitor: "{{ groups[cm_hm_group][0] }}"
+cm_service_monitor: "{{ groups[cm_sm_group][0] }}"
+cm_activity_monitor: "{{ groups[cm_am_group][0] }}"
+cm_navigator: "{{ groups[cm_nav_group][0] }}"
+cm_navigator_metaserver: "{{ groups[cm_navm_group][0] }}"
+cm_reports_manager: "{{ groups[cm_repm_group][0] }}"
+cm_slave_template: wd-slave-0
+cm_gateway_template: wd-gateway-0
+cm_api_uri: "{{ cm_server_scheme }}://{{ cm_remote_server }}:{{ cm_server_port }}/api/{{ cm_api_version }}"
+
+fusion_cdh_version: "{{ cdh_version|regex_replace('\\.\\d+$', '.0') }}"
+fusion_platform_type: "cdh"
+fusion_platform: "{{fusion_platform_type}}-{{ fusion_cdh_version }}"
+parcel_oscode: el6
+
+hive_database: "{% if desired_hive_database %}{{desired_hive_database}}{% else %}postgresql{% endif %}"
+
+cmf_path: "{% if cm_major_version|int >= 6 %}/opt/cloudera/cm{% else %}/usr/share/cmf{% endif %}"
+
+hdfs_active_namenode_detection_window: "hdfs_active_namenode_{% if cm_version is version('6.0', '>=') %}detection{% else %}detecton{% endif %}_window"
+yarn_active_resourcemanager_detection_window: "yarn_active_resourcemanager_{% if cm_version is version('6.0', '>=') %}detection{% else %}detecton{% endif %}_window"
+
+ranger_admin_password: loneR4ng3r
+ranger_keyadmin_password: loneR4ng3r
+
+redaction_policy_enabled: true
+
+ldp_parcel_version: 2.17.0.0.4276_SNAPSHOT
+ldp_csd_version: "{{ldp_parcel_version}}"
+ldp_repo_url: "http://fusion-repo.wandisco.com"
+ldp_csd_baseurl: "{{ldp_repo_url}}/ldp/{{ldp_majmin}}/csds/"
+cdh_parcel_repos: "http://archive.cloudera.com/impala/parcels/latest/,{{ldp_repo_url}}/ldp/{{ldp_majmin}}/parcels/"
+cdh_ldp_service_name: fusion{{cdh_service_number}}

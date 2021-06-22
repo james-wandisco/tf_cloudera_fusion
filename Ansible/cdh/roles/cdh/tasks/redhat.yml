@@ -1,0 +1,106 @@
+---
+- name: "install cdh packages - hdfs, yarn, mapreduce"
+  yum:
+    name:
+      - hadoop
+      - bigtop-jsvc
+      - bigtop-utils
+      - hadoop-client
+      - hadoop-hdfs
+      - hadoop-hdfs-datanode
+      - hadoop-hdfs-journalnode
+      - hadoop-hdfs-namenode
+      - hadoop-hdfs-secondarynamenode
+      - hadoop-hdfs-zkfc
+      - hadoop-httpfs
+      - hadoop-mapreduce
+      - hadoop-mapreduce-historyserver
+      - hadoop-yarn
+      - hadoop-yarn-nodemanager
+      - hadoop-yarn-proxyserver
+      - hadoop-yarn-resourcemanager
+      - zookeeper
+    disablerepo: "{{ internal_repo_name }}"
+    state: present
+  register: yum_install
+  until: yum_install.rc|default(1) == 0
+  retries: 5
+  delay: 1
+  tags:
+    - install-cdh
+    - install-hadoop
+
+- name: "install cdh packages - hbase"
+  yum:
+    name:
+      - hbase
+      - hbase-master
+      - hbase-regionserver
+      - hbase-rest
+      - hbase-thrift
+      - zookeeper
+      - zookeeper-native
+      - zookeeper-server
+    disablerepo: "{{ internal_repo_name }}"
+    state: present
+  register: yum_install
+  until: yum_install.rc|default(1) == 0
+  retries: 5
+  delay: 1
+  when: is_running_hbase
+  tags:
+    - install-cdh
+    - install-hbase
+
+- name: "install cdh packages - oozie"
+  yum:
+    name:
+      - oozie
+      - oozie-client
+    disablerepo: "{{ internal_repo_name }}"
+    state: present
+  when: is_running_oozie
+  register: yum_install
+  until: yum_install.rc|default(1) == 0
+  retries: 5
+  delay: 1
+  tags:
+    - install-cdh
+    - install-oozie
+
+- name: "install cdh packages - pig"
+  yum:
+    name:
+      - pig
+      - pig-udf-datafu
+    disablerepo: "{{ internal_repo_name }}"
+    state: present
+  when: is_running_pig
+  register: yum_install
+  until: yum_install.rc|default(1) == 0
+  retries: 5
+  delay: 1
+  tags:
+    - install-cdh
+    - install-pig
+
+- name: "install cdh packages - hive"
+  yum:
+    name:
+      - hive
+      - hive-hcatalog
+      - hive-jdbc
+      - hive-metastore
+      - hive-server2
+      - hive-webhcat
+      - hive-webhcat-server
+    disablerepo: "{{ internal_repo_name }}"
+    state: present
+  register: yum_install
+  until: yum_install.rc|default(1) == 0
+  retries: 5
+  delay: 1
+  when: is_running_hive
+  tags:
+    - install-cdh
+    - install-hive

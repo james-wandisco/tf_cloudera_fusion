@@ -1,0 +1,24 @@
+---
+
+- include: redhat.yml
+  when: ansible_facts.os_family == 'RedHat'
+  tags:
+    - install-cdh
+    - install-cdh-security-kdc
+    - install-security
+    - create-keytabs
+
+- include: debian.yml
+  when: ansible_facts.os_family == 'Debian'
+  tags:
+    - install-cdh
+    - install-cdh-security-kdc
+    - install-security
+    - create-keytabs
+
+- include: common.yml
+  tags:
+    - install-cdh
+    - install-cdh-security-kdc
+    - install-security
+    - create-keytabs
