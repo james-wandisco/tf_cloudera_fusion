@@ -1,0 +1,29 @@
+---
+- name: List principals - CDH
+  command: /usr/sbin/kadmin.local -q 'listprincs'
+  register: krb_principals
+
+- name: Create cloudera-scm admin user principal
+  command: /usr/sbin/kadmin.local -q "addprinc -pw {{kerberos_server_kadmin_pass}} cloudera-scm/admin@{{kerberos_server_realm_name|upper()}}"
+  when: "'cloudera-scm/admin@%s'|format(kerberos_server_realm_name|upper()) not in krb_principals.stdout_lines"
+  tags:
+    - install-cdh-security-kdc
+    - install-security
+    - generate-principals
+
+- name: Create service superuser principals
+  command: /usr/sbin/kadmin.local -q "addprinc -randkey -pw {{kerberos_server_kadmin_pass}} {{item}}@{{kerberos_server_realm_name|upper()}}"
+  loop:
+    - cloudera-qa
+    - hbase
+    - "{{hdfs_user}}"
+    - "{{hive_user}}"
+    - mapred
+    - oozie
+    - yarn
+    - zookeeper
+  when: "'%s@%s'|format(item, kerberos_server_realm_name|upper()) not in krb_principals.stdout_lines"
+  tags:
+    - install-cdh-security-kdc
+    - install-security
+    - generate-principals

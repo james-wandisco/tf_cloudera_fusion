@@ -1,0 +1,10 @@
+---
+- include: create-principals.yml
+  tags:
+    - prep-security
+    - prep-cdh-security
+
+- include: create-keytabs.yml
+  tags:
+    - prep-security
+    - prep-cdh-security

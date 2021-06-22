@@ -1,0 +1,17 @@
+---
+- name: Create keytabs directory - permissions will be hardened later
+  file: path=/etc/security/keytabs state=directory owner=root group=hadoop mode=0777
+
+- name: Generate admin user keytabs in /etc/security/keytabs
+  command: /usr/sbin/kadmin.local -q "xst {{norandkey}} -k /etc/security/keytabs/{{ item.keytab }} {{ item.owner }}@{{ kerberos_server_realm_name|upper() }}" creates=/etc/security/keytabs/{{ item.keytab }}
+  loop:
+    - { keytab: 'cloudera-qa.headless.keytab', owner: 'cloudera-qa' }
+    - { keytab: 'hdfs.headless.keytab', owner: "{{hdfs_user}}" }
+    - { keytab: 'hbase.headless.keytab', owner: 'hbase' }
+
+- name: Set permissions of keytab files - will be hardened later
+  file: path=/etc/security/keytabs/{{item}}.headless.keytab mode=0755
+  loop:
+    - cloudera-qa
+    - hdfs
+    - hbase
