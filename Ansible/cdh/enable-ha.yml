@@ -1,0 +1,10 @@
+---
+- hosts: cm
+  become: yes
+  become_user: root
+  become_method: sudo
+  any_errors_fatal: true
+  gather_facts: no
+  roles:
+    - { role: cloudera-ha, when: trigger_ha_mode or create_hdfs_dirs }
+

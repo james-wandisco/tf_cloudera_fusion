@@ -1,0 +1,10 @@
+{
+{% for role in hdfs_roles.json['items'] %}
+{% if role.type == "NAMENODE" %}
+  "activeNnName": "{{role.name}}",
+{% endif %}
+{% endfor %}
+  "nameservice": "{{nameservice}}",
+  "standbyNnHostId": "{{standby_namenode}}",
+  "zkServiceName": "{{zookeeper_service_name}}"
+}

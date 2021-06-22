@@ -1,0 +1,107 @@
+---
+- hosts: all
+  become: yes
+  become_user: root
+  become_method: sudo
+  any_errors_fatal: true
+  gather_facts: yes
+  gather_subset:
+    - '!all'
+  roles:
+    - { role: kerberos-client, when: is_running_security }
+
+
+- hosts: kerberos-kdc
+  become: yes
+  become_user: root
+  become_method: sudo
+  any_errors_fatal: true
+  gather_facts: no
+  roles:
+    - { role: kerberos-server, when: is_running_security }
+    - { role: cdh-security-kdc, when: is_running_security and is_running_cdh}
+    - { role: hdp-security-kdc, when: is_running_security and is_running_hdp}
+
+- hosts: all
+  become: yes
+  become_user: root
+  become_method: sudo
+  any_errors_fatal: true
+  gather_facts: no
+  roles:
+    - { role: cdh-security-shared, when: is_running_security and is_running_cdh }
+
+- hosts: cm
+  become: yes
+  become_user: root
+  become_method: sudo
+  any_errors_fatal: true
+  gather_facts: no
+  roles:
+    - { role: cdh-security-enabled, when: is_running_security }
+
+- hosts: cdh-all
+  become: yes
+  become_user: root
+  become_method: sudo
+  any_errors_fatal: true
+  gather_facts: no
+  roles:
+    - { role: cdh-yarn-clean, when: is_running_security }
+
+- hosts: cm
+  become: yes
+  become_user: root
+  become_method: sudo
+  any_errors_fatal: true
+  gather_facts: no
+  roles:
+    - { role: cdh-security-start, when: is_running_security }
+
+- hosts: all
+  become: yes
+  become_user: root
+  become_method: sudo
+  any_errors_fatal: true
+  gather_facts: no
+  roles:
+    - { role: hdp-security-shared, when: is_running_security and is_running_hdp }
+
+- hosts: ambari
+  become: yes
+  become_user: root
+  become_method: sudo
+  any_errors_fatal: true
+  gather_facts: yes
+  gather_subset:
+    - '!all'
+  roles:
+    - { role: hdp-security-enabled, when: is_running_security }
+
+- hosts: kerberos-kdc
+  become: yes
+  become_user: root
+  become_method: sudo
+  any_errors_fatal: true
+  gather_facts: no
+  roles:
+    - { role: create-fusion-https-principal, when: is_running_security }
+    - { role: wdhive-security, when: is_running_security }
+
+- hosts: all
+  become: yes
+  become_user: root
+  become_method: sudo
+  any_errors_fatal: true
+  gather_facts: no
+  roles:
+    - { role: kerberos-merge-keytab, when: is_running_security }
+
+- hosts: fusion
+  become: yes
+  become_user: root
+  become_method: sudo
+  any_errors_fatal: true
+  gather_facts: no
+  roles:
+    - { role: wdhive-security-clients, when: is_running_security }

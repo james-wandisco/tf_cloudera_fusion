@@ -1,0 +1,8 @@
+---
+- name: Refresh cluster
+  uri:
+    url={{cm_api_uri}}/clusters/{{cdh_cluster_name}}/commands/refresh
+    user=admin
+    password=admin
+    method=POST
+    status_code=200,204

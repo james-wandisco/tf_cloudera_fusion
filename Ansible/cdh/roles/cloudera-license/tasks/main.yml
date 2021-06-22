@@ -1,0 +1,5 @@
+---
+- include: add-license.yml
+  when:
+    - cdh_version is version('6.3.3', '>=')
+    - external_manager is not defined

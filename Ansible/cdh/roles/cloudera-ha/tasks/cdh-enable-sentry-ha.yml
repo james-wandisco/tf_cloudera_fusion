@@ -1,0 +1,44 @@
+---
+- name: "Enable Sentry HA: Wait for no active commands"
+  uri:
+    url={{cm_api_uri}}/cm/commands
+    user=admin
+    password=admin
+    status_code=200,204
+    return_content=yes
+  retries: 150
+  delay: 3
+  register: check_no_active
+  until: check_no_active.json is defined and 'items' in check_no_active.json and check_no_active.json['items'] == []
+
+- name: "Enable Sentry HA: Send command to Cloudera Manager"
+  uri:
+    url={{cm_api_uri}}/clusters/{{cdh_cluster_name}}/services/{{cdh_sentry_service_name}}/commands/enableSentryHa
+    user=admin
+    password=admin
+    method=POST
+    body='{"newSentryHostId":"{{standby_namenode}}","zkServiceName":"{{zookeeper_service_name}}"}'
+    body_format=json
+    status_code=200,204
+    return_content=yes
+  register: sentry_ha_command
+
+- name: "Show Sentry HA command ouput"
+  debug: var=sentry_ha_command
+  when: debug
+
+- name: "Check Sentry HA command was successful"
+  fail: msg="Sentry HA command failed - {{sentry_ha_command.json['resultMessage']}}"
+  when: sentry_ha_command.json is defined and 'success' in sentry_ha_command.json and not sentry_ha_command.json['success']
+
+- name: "Wait for commands to complete"
+  uri:
+    url={{cm_api_uri}}/clusters/{{cdh_cluster_name}}/services/{{cdh_sentry_service_name}}/commands
+    user=admin
+    password=admin
+    status_code=200,204
+    return_content=yes
+  retries: 200
+  delay: 3
+  register: check_no_active
+  until: check_no_active.json is defined and 'items' in check_no_active.json and check_no_active.json['items'] == []

@@ -1,0 +1,72 @@
+---
+- name: "Enable HA: Wait for no active commands"
+  uri:
+    url={{cm_api_uri}}/cm/commands
+    user=admin
+    password=admin
+    status_code=200,204
+    return_content=yes
+  retries: 150
+  delay: 3
+  register: check_no_active
+  until: check_no_active.json is defined and 'items' in check_no_active.json and check_no_active.json['items'] == []
+
+- name: "Enable HA: Fetch roles"
+  uri:
+    url={{cm_api_uri}}/clusters/{{cdh_cluster_name}}/services/{{cdh_hdfs_service_name}}/roles
+    user=admin
+    password=admin
+    status_code=200,204
+    return_content=yes
+  register: hdfs_roles
+
+- name: "Show roles"
+  debug: var=hdfs_roles.json
+  when: debug and hdfs_roles.json is defined
+
+- name: "Create json for enabling HA"
+  template: src=hdfs-ha.json.j2 dest=/tmp/hdfs-ha.json
+
+- name: "Read in json"
+  slurp: src=/tmp/hdfs-ha.json
+  register: hdfs_ha_json
+
+- name: "Show json"
+  debug: msg="{{hdfs_ha_json.content|b64decode}}"
+  when: debug
+
+- name: "Enable HA: Send data to Cloudera Manager"
+  uri:
+    url={{cm_api_uri}}/clusters/{{cdh_cluster_name}}/services/{{cdh_hdfs_service_name}}/commands/hdfsEnableNnHa
+    user=admin
+    password=admin
+    method=POST
+    body='{{hdfs_ha_json.content|b64decode}}'
+    body_format=json
+    status_code=200,204
+    return_content=yes
+  register: ha_command
+
+- name: "Show ha ouput"
+  debug: var=ha_command
+  when: debug
+
+- name: "Check HA command was successful"
+  fail: msg="HA command failed - {{ha_command.json['resultMessage']}}"
+  when: ha_command.json is defined and 'success' in ha_command.json and not ha_command.json['success']
+
+- name: "Cleanup HA Json"
+  file: path=/tmp/hdfs-ha.json state=absent
+  when: not debug
+
+- name: "Wait for commands to complete"
+  uri:
+    url={{cm_api_uri}}/clusters/{{cdh_cluster_name}}/services/{{cdh_hdfs_service_name}}/commands
+    user=admin
+    password=admin
+    status_code=200,204
+    return_content=yes
+  retries: 300
+  delay: 3
+  register: check_no_active
+  until: check_no_active.json is defined and 'items' in check_no_active.json and check_no_active.json['items'] == []

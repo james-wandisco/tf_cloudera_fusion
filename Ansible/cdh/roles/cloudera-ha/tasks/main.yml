@@ -1,0 +1,28 @@
+---
+- include: cdh-enable-ha.yml
+  when: is_running_ha
+  tags:
+    - create-cluster
+    - create-cdh-cluster
+    - enable-hdfs-ha
+
+- include: cdh-enable-yarn-ha.yml
+  when: is_running_yarn_ha
+  tags:
+    - create-cluster
+    - create-cdh-cluster
+    - enable-hdfs-ha
+
+- include: cdh-enable-sentry-ha.yml
+  when: is_running_sentry_ha
+  tags:
+    - create-cluster
+    - create-cdh-cluster
+    - enable-hdfs-ha
+
+- include: refresh.yml
+  when: is_running_ha or is_running_yarn_ha
+  tags:
+    - create-cluster
+    - create-cdh-cluster
+    - enable-hdfs-ha

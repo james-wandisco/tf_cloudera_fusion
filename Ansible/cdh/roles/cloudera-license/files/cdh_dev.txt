@@ -1,0 +1,29 @@
+-----BEGIN PGP SIGNED MESSAGE-----
+Hash: SHA256
+
+{
+  "deactivationDate" : "2022-02-18",
+  "features" : [ ],
+  "name" : "WANdisco_CDP-PVC-Base_Dev",
+  "uuid" : "daa872d8-9157-4afc-b7a9-7d5b44893ca7",
+  "version" : 1,
+  "startDate" : "2021-02-18",
+  "expirationDate" : "2022-02-18"
+}
+-----BEGIN PGP SIGNATURE-----
+Version: BCPG v1.46
+
+iQIcBAEBCAAGBQJgLkXYAAoJECXwRXLmH8tlQnQQAK1A9ePoY03zNK9FN20oUy0E
+xrzT6vRuAsT3f3n70YnDkYglf/MTrU89HzIwBDAkGMNAoQc1s3bPSbByg7IQIUOp
+x4K7i2PqDfEqx55W1+c8LiyYYgvDWhSGg5LhkDO405/2nTwzkn5pW8etEw/xKgNx
+TP5bOrBZb0rk+UbsPE/BkqQAQ7Xln0wgdXPOrURinascfvdZ7hIaAk2GF/KVIrGV
+1mkNQDVsUt57DJf2IISdQjgimFq+G8I07XWh28Oof6sBL5LYCRCXTYRykzNtdyux
+jEOGViMHEmt2TzC1mNIk/0Hp9grvMoghEhUZh92wg2GB24Pks/Vi4YJinuXlqo9m
+FxBUWsXKGku7Iv28dVGpJezUBHSjfF/SOkTAXgIg+E00FfXunbFql83tBDk3eH0s
+xaPItXrYJEZk1qXelOvACZ3/OJyjEte5f/mlZCBpa/KgcIRMT+dlN7Fl+Yj4LbBO
+4gVWox3DjLKIxAbZgiDShnEibNQ4D0+3VMCw2SipGr7CemLzyjZWsDBz9DFyRyjz
+nPF4JtMqz+IhZ1A5S3i0g4tW+LXlJAlaASLA/2b3A11eJMzaQ9R2Go/+P+b2B1CH
+MaxBvUm/ENw0/sCZGPKN0Tj2Xvl2Tke3qpZJ/AwNdwt9fM/xrMQiTrvSbH3SGZAu
+34zlmm9bNTgZCU/Qh6pt
+=27Rx
+-----END PGP SIGNATURE-----

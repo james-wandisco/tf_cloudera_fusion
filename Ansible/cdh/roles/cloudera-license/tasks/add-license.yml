@@ -1,0 +1,7 @@
+---
+- name: Copy Dev License Key
+  copy: src=cdh_dev.txt dest=/tmp/cdh_dev.txt
+
+# Ansible's uri module doesn't support multipart/form-data
+- name: Apply the dev license
+  command: curl -u admin:admin -X POST -H "Content-Type=multipart/form-data" -F license=@/tmp/cdh_dev.txt "{{cm_api_uri}}/cm/license" warn=False
