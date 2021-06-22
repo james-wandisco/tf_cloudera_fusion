@@ -1,0 +1,213 @@
+
+[kerberos-kdc]
+52.174.93.205
+
+#
+# DC-1
+#
+
+# all nodes in CDH cluster
+[all-DC-1]
+52.174.93.205
+52.174.93.232
+
+[cdh-all-DC-1:children]
+all-DC-1
+
+# host that will run Cloudera Manager.
+# there should only be one host entry.
+[cm-DC-1]
+52.174.93.205
+
+# hosts designated as NsNN
+[nsnn-nodes-DC-1]
+52.174.93.205
+52.174.93.232
+
+#####
+# enter one Namenode
+[nn-DC-1]
+52.174.93.205
+
+# Enter one SecondaryNamenode
+[snn-DC-1]
+52.174.93.232
+
+# enter one Resourcemanager
+# if running MRv1 (is_running_mapreduce=true), the entry
+# here will be the Jobtracker
+[rm-DC-1]
+52.174.93.232
+
+# enter one History Server
+[jhs-DC-1]
+52.174.93.232
+
+# enter slaves (DN and NM)
+[slaves-DC-1]
+52.174.93.232
+
+# enter no more than 2 HBase Masters
+[hbm-DC-1]
+52.174.93.232
+
+# enter at least 3 Zookeepers
+[zk-DC-1]
+node-9.test.wandisco.com
+node-10.test.wandisco.com
+node-11.test.wandisco.com
+
+# host running cloudera manager alert publisher
+[cm-alert-publisher-DC-1]
+52.174.93.232
+
+# host running cloudera manager event server
+[cm-event-server-DC-1]
+52.174.93.232
+
+# host running cloudera manager host monitor
+[cm-host-monitor-DC-1]
+52.174.93.232
+
+# host running cloudera manager service monitor
+[cm-service-monitor-DC-1]
+52.174.93.232
+
+# host running cloudera manager activity monitor
+[cm-activity-monitor-DC-1]
+52.174.93.232
+
+# host running cloudera manager navigator
+[cm-navigator-DC-1]
+52.174.93.232
+
+# host running cloudera manager navigator metaserver
+[cm-navigator-metaserver-DC-1]
+52.174.93.232
+
+# host running cloudera manager reports manager
+[cm-reports-manager-DC-1]
+52.174.93.232
+
+# enter Oozie Server
+#[oozie-DC-1]
+#
+# enter Hive Server
+#[hive-DC-1]
+
+#
+# DC-2
+#
+
+# all nodes in CDH cluster
+[all-DC-2]
+node-0.test.wandisco.com cluster=DC-2
+node-1.test.wandisco.com cluster=DC-2
+node-2.test.wandisco.com cluster=DC-2
+node-3.test.wandisco.com cluster=DC-2
+node-4.test.wandisco.com cluster=DC-2
+node-5.test.wandisco.com cluster=DC-2
+
+[cdh-all-DC-2:children]
+all-DC-2
+
+# host that will run Cloudera Manager.
+# there should only be one host entry.
+[cm-DC-2]
+node-0.test.wandisco.com
+
+
+# hosts designated as NsNN
+[nsnn-nodes-DC-2]
+node-1.test.wandisco.com
+node-2.test.wandisco.com
+
+
+#####
+# enter one Namenode
+[nn-DC-2]
+node-0.test.wandisco.com
+
+## enter one SecondaryNamenode
+[snn-DC-2]
+node-0.test.wandisco.com
+
+# enter one Resourcemanager;
+# if running MRv1 (is_running_mapreduce=true), the entry
+# here will be the Jobtracker
+[rm-DC-2]
+node-2.test.wandisco.com
+
+# enter one History Server
+[jhs-DC-2]
+node-2.test.wandisco.com
+
+# enter slaves (DN and NM)
+[slaves-DC-2]
+node-3.test.wandisco.com
+node-4.test.wandisco.com
+node-5.test.wandisco.com
+
+# enter no more than 2 HBase Masters
+[hbm-DC-2]
+node-1.test.wandisco.com
+
+# enter at least 3 Zookeepers
+[zk-DC-2]
+node-3.test.wandisco.com
+node-4.test.wandisco.com
+node-5.test.wandisco.com
+
+# host running cloudera manager alert publisher
+[cm-alert-publisher-DC-2]
+node-2.test.wandisco.com
+
+# host running cloudera manager event server
+[cm-event-server-DC-2]
+node-3.test.wandisco.com
+
+# host running cloudera manager host monitor
+[cm-host-monitor-DC-2]
+node-4.test.wandisco.com
+
+# host running cloudera manager service monitor
+[cm-service-monitor-DC-2]
+node-5.test.wandisco.com
+
+# host running cloudera manager activity monitor
+[cm-activity-monitor-DC-2]
+node-2.test.wandisco.com
+
+# host running cloudera manager navigator
+[cm-navigator-DC-2]
+node-3.test.wandisco.com
+
+# host running cloudera manager navigator metaserver
+[cm-navigator-metaserver-DC-2]
+node-4.test.wandisco.com
+
+# host running cloudera manager reports manager
+[cm-reports-manager-DC-2]
+node-5.test.wandisco.com
+
+# enter Oozie Server
+#[oozie-DC-2]
+#
+# enter Hive Server
+#[hive-DC-2]
+#
+
+# alias for all DC NsNN hosts
+[nsnn-nodes:children]
+nsnn-nodes-DC-1
+nsnn-nodes-DC-2
+
+# alias for all cm hosts
+[cm:children]
+cm-DC-1
+cm-DC-2
+
+# alias for all cdh hosts
+[cdh-all:children]
+cdh-all-DC-1
+cdh-all-DC-2
