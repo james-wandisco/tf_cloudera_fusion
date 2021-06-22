@@ -1,0 +1,15 @@
+---
+- include_role: name=check-parcel-status
+
+- name: "distribute parcel"
+  uri:
+    url={{cm_api_uri}}/clusters/{{ cdh_cluster_name }}/parcels/products/CDH/versions/{{ cdh_parcel_version }}/commands/startDistribution
+    user=admin
+    password=admin
+    method=POST
+    status_code=200
+  when: is_running_parcels and parcelstatus.json.stage == "DOWNLOADED"
+  tags:
+    - create-cdh-cluster
+    - deploy-local-parcel
+    - bare-cloudera-parcel

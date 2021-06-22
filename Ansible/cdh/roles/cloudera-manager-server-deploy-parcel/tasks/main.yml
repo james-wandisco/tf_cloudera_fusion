@@ -1,0 +1,14 @@
+---
+- include: distribute-parcel.yml
+
+- include_role: name=ldp-parcel
+  when: is_running_ldp
+  vars:
+    parcel_name: FUSION
+    parcel_version_suffix: ""
+
+- include_role: name=ldp-parcel
+  when: is_running_ldp
+  vars:
+    parcel_name: FUSION_CLIENT
+    parcel_version_suffix: ".cdh{{cdh_major_version}}"
