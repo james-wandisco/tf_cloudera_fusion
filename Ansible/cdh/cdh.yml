@@ -7,7 +7,6 @@
   any_errors_fatal: true
   gather_facts: yes
   roles:
-    - cloudera-shared
     - { role: cdh, when: not is_running_parcels }
     - cloudera-manager-agent
 
@@ -47,7 +46,6 @@
   roles:
     - cloudera-license
     - cloudera-manager-server-complete
-
 
 ###
 ### HDFS HA
