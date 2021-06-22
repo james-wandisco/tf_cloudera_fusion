@@ -1,0 +1,19 @@
+---
+- name: Get parcel status
+  uri:
+    url: "{{cm_api_uri}}/clusters/{{ cdh_cluster_name }}/parcels/products/CDH/versions/{{ cdh_parcel_version }}"
+    user: admin
+    password: admin
+    force_basic_auth: yes
+    method: GET
+    status_code: 200,204
+    return_content: yes
+    timeout: 120
+  register: parcelstatus
+  when: is_running_parcels
+  until:
+    - parcelstatus is defined
+    - parcelstatus.json is defined
+    - parcelstatus.json.stage is defined
+  retries: 100
+  delay: 3
