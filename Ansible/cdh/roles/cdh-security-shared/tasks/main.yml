@@ -1,0 +1,9 @@
+---
+- include: collect-keytabs.yml
+  tags:
+    - prep-security
+    - prep-cdh-security
+    - install-cdh-security-shared
+    - install-cdh-security
+    - install-security
+    - collect-keytabs

@@ -1,0 +1,7 @@
+---
+- name: Fetch keytab
+  synchronize: src=/tmp/kt/hive_{{inventory_hostname}} dest=/etc/security/keytabs/hive.service.keytab set_remote_user=no
+  delegate_to: "{{kerberos_server_fqdn}}"
+
+- name: Set keytab permissions
+  file: path=/etc/security/keytabs/hive.service.keytab owner=hive group=hadoop mode=0440

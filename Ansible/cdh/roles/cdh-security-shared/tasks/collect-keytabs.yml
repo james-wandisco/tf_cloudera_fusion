@@ -1,0 +1,24 @@
+---
+- name: Create keytabs directory
+  file: path=/etc/security/keytabs state=directory owner=root group=hadoop mode=0777
+
+- name: Wait for kerberos kdc to be online
+  wait_for: host={{ kerberos_server_fqdn }} port={{ kerberos_server_kdc_port }}
+
+- name: Place admin user keytabs in /etc/security/keytabs
+  synchronize: src=/etc/security/keytabs/{{item}}.headless.keytab dest=/etc/security/keytabs/{{item}}.headless.keytab set_remote_user=no private_key=/root/.ssh/id_rsa
+  delegate_to: "{{kerberos_server_fqdn}}"
+  loop:
+    - cloudera-qa
+    - hdfs
+    - hbase
+
+- name: Lock down /etc/security/keytabs
+  file: path=/etc/security/keytabs state=directory owner=root group=hadoop mode=0750
+
+- name: Ensure keytab permissions are correct
+  file: path=/etc/security/keytabs/{{item.keytab}} owner={{item.owner}}
+  loop:
+    - { keytab: 'cloudera-qa.headless.keytab', owner: 'cloudera-qa' }
+    - { keytab: 'hdfs.headless.keytab', owner: "{{hdfs_user}}" }
+    - { keytab: 'hbase.headless.keytab', owner: 'hbase' }

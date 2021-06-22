@@ -1,0 +1,24 @@
+---
+- name: Ensure /etc/security/keytabs exists
+  file: path=/etc/security/keytabs state=directory owner=root group=hadoop mode=0750
+
+- name: Get keytab from the kdc
+  synchronize: src=/tmp/kt/spnego.{{inventory_hostname}}.keytab dest=/etc/security/keytabs/spnego.service.keytab set_remote_user=no
+  delegate_to: "{{kerberos_server_fqdn}}"
+
+- name: Get ranger ha keytab from the kdc
+  synchronize: src=/tmp/kt/spnego.{{inventory_hostname}}.keytab dest=/etc/security/keytabs/ranger.ha.keytab set_remote_user=no
+  delegate_to: "{{kerberos_server_fqdn}}"
+  when: is_running_ranger_ha
+
+- name: Set keytab permissions
+  file: path=/etc/security/keytabs/spnego.service.keytab owner={{hdfs_user}} group=hadoop mode=0640
+
+- name: Set ranger ha keytab permissions
+  file: path=/etc/security/keytabs/ranger.ha.keytab owner=ranger group=hadoop mode=0440
+  when: is_running_ranger_ha
+
+- name: "Merge hdfs and HTTP keytabs"
+  command: /usr/bin/ktutil
+  args:
+    stdin: "rkt /etc/security/keytabs/spnego.service.keytab\nwkt /etc/security/keytabs/hdfs.headless.keytab\n"

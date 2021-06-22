@@ -1,0 +1,20 @@
+---
+- name: List principals
+  command: /usr/sbin/kadmin.local -q 'listprincs'
+  register: krb_principals
+
+- name: Create hive principal for fusion servers if necessary
+  command: /usr/sbin/kadmin.local -q 'addprinc -randkey hive/{{item}}@{{kerberos_server_realm_name|upper()}}'
+  loop: "{{groups[fusion_group]}}"
+  when: "'hive/%s@%s'|format(item, kerberos_server_realm_name|upper()) not in krb_principals.stdout_lines"
+
+- name: Create temporary directory for keytabs
+  file: path=/tmp/kt state=directory
+
+- name: Create hive keytab for fusion servers if necessary
+  command: /usr/sbin/kadmin.local -q 'xst {{norandkey}} -k /tmp/kt/hive_{{item}} hive/{{item}}@{{kerberos_server_realm_name|upper()}}' creates=/tmp/kt/hive_{{item}}
+  loop: "{{groups[fusion_group]}}"
+
+- name: Ensure the keytab is readable
+  file: path=/tmp/kt/hive_{{item}} mode='0644'
+  loop: "{{groups[fusion_group]}}"
