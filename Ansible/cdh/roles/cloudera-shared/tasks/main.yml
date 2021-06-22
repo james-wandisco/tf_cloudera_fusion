@@ -1,6 +1,4 @@
 ---
-- include: unset-deprecated.yml
-  when: cdh_version is version('7.0.0', '>=')
 
 - include: rh-shared.yml
   when: ansible_facts.ansible_os_family == 'RedHat'

@@ -1,24 +1,16 @@
 ---
 
-##
-## Common
-##
-
-
 - hosts: cdh-all
   become: yes
   become_user: root
   become_method: sudo
   any_errors_fatal: true
-  gather_facts: no
+  gather_facts: yes
   roles:
     - cloudera-shared
     - { role: cdh, when: not is_running_parcels }
     - cloudera-manager-agent
 
-##
-## Cloudera manager
-##
 - hosts: cdh-all
   become: yes
   become_user: root
