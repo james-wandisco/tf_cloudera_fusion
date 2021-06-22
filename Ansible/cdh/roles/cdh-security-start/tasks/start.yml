@@ -1,0 +1,81 @@
+---
+- name: "deploy cluster client config"
+  uri:
+    url: '{{cm_api_uri}}/clusters/{{ cdh_cluster_name }}/commands/deployClientConfig'
+    user: admin
+    password: admin
+    method: POST
+    status_code: 200
+    timeout: 60
+  register: deployccstat
+
+- name: "wait for deployClientConfig to complete before proceeding with next steps"
+  uri:
+    url: '{{cm_api_uri}}/commands/{{ deployccstat.json.id }}'
+    user: admin
+    password: admin
+    status_code: 200,204
+    return_content: yes
+    timeout: 300
+  register: deployccdone
+  until: deployccdone.json is defined and deployccdone.json.success is defined and deployccdone.json.success and not deployccdone.json.active
+  retries: 30
+  delay: 10
+  failed_when: deployccdone.json is defined and deployccdone.json.success is defined and not deployccdone.json.success and not deployccdone.json.active
+
+
+- name: "start cloudera manager service"
+  uri:
+    url: '{{cm_api_uri}}/cm/service/commands/start'
+    user: admin
+    password: admin
+    method: POST
+    status_code: 200,204
+    return_content: yes
+  register: cmstartstat
+
+- name: "debug var=cmstartstat"
+  debug: var=cmstartstat
+  when: debug
+
+- name: "wait for commands to complete before proceeding with next steps"
+  uri:
+    url: '{{cm_api_uri}}/clusters/{{cluster}}/commands'
+    user: admin
+    password: admin
+    status_code: 200,204
+    return_content: yes
+    timeout: 180
+  when: not cluster_kerberos_enabled
+  register: running_commands
+  until: running_commands.json is defined and 'items' in running_commands.json and running_commands.json['items'] == []
+  retries: 240
+  delay: 3
+
+- name: "start cluster"
+  uri:
+    url: '{{cm_api_uri}}/clusters/{{ cdh_cluster_name }}/commands/start'
+    user: admin
+    password: admin
+    method: POST
+    status_code: 200,204
+    return_content: yes
+  register: cdhstartstat
+
+- name: "debug var=cdhstartstat"
+  debug: var=cdhstartstat
+  when: debug
+
+- name: "wait for commands to complete before proceeding with next steps"
+  uri:
+    url: '{{cm_api_uri}}/clusters/{{cluster}}/commands'
+    user: admin
+    password: admin
+    status_code: 200,204
+    return_content: yes
+    timeout: 180
+  when: not cluster_kerberos_enabled
+  register: running_commands
+  until: running_commands.json is defined and 'items' in running_commands.json and running_commands.json['items'] == []
+  retries: 240
+  delay: 3
