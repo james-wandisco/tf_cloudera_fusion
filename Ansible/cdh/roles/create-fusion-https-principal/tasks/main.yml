@@ -1,0 +1,5 @@
+---
+- include: create-fusion-http-user.yml
+  tags:
+    - prep-security
+    - prep-cdh-security

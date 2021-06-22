@@ -1,0 +1,38 @@
+---
+- name: List principals
+  command: kadmin.local -q 'listprincs'
+  register: princ_list
+
+- name: Make keytab directory
+  file: path=/tmp/kt state=directory
+
+- name: Create HTTP principal for all hosts if necessary
+  command: kadmin.local -q 'addprinc -randkey HTTP/{{item}}@{{kerberos_server_realm_name|upper()}}'
+  loop: "{{all_dc_nodes}}"
+  when: "'HTTP/%s@%s'|format(item, kerberos_server_realm_name|upper()) not in princ_list.stdout_lines"
+
+- name: Create HTTP keytab for all hosts if necessary
+  command: kadmin.local -q 'xst {{norandkey}} -k /tmp/kt/spnego.{{item}}.keytab HTTP/{{item}}@{{kerberos_server_realm_name|upper()}}' creates=/tmp/kt/spnego.{{item}}.keytab
+  loop: "{{all_dc_nodes}}"
+
+- name: Ranger HA - list principals in primary keytab
+  command: klist -kt /tmp/kt/spnego.{{ranger_primary}}.keytab
+  register: ranger_primary_kt
+  when: is_running_ranger_ha
+
+- name: Ranger HA - add secondary server principal to primary keytab
+  command: kadmin.local -q 'ktadd {{norandkey}} -k /tmp/kt/spnego.{{ranger_primary}}.keytab HTTP/{{ranger_secondary}}@{{kerberos_server_realm_name|upper()}}'
+  when: "is_running_ranger_ha and 'HTTP/%s@%s'|format(ranger_secondary, kerberos_server_realm_name|upper()) not in ranger_primary_kt.stdout_lines"
+
+- name: Ranger HA - list principals in secondary keytab
+  command: klist -kt /tmp/kt/spnego.{{ranger_secondary}}.keytab
+  register: ranger_secondary_kt
+  when: is_running_ranger_ha
+
+- name: Ranger HA - add primary server principal to secondary keytab
+  command: kadmin.local -q 'ktadd {{norandkey}} -k /tmp/kt/spnego.{{ranger_secondary}}.keytab HTTP/{{ranger_primary}}@{{kerberos_server_realm_name|upper()}}'
+  when: "is_running_ranger_ha and 'HTTP/%s@%s'|format(ranger_primary, kerberos_server_realm_name|upper()) not in ranger_secondary_kt.stdout_lines"
+
+- name: Let everyone read the keytabs
+  file: path=/tmp/kt/spnego.{{item}}.keytab mode='0644'
+  loop: "{{all_dc_nodes}}"
