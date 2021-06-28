@@ -14,7 +14,6 @@
 
 - name: "Install mariadb-server if using it for hive"
   yum: name=mariadb-server disablerepo={{internal_repo_name}} state=present
-  when: inventory_hostname == cm_server_fqdn
 
 - name: "Install mysql-connector-java if using it for hive"
   yum: name=mysql-connector-java disablerepo={{internal_repo_name}} state=present
