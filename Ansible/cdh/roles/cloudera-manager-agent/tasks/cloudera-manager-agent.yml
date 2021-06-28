@@ -11,14 +11,15 @@
     - create-cluster
     - bare-cloudera
 
-- name: "update cloudera scm listening_hostname option in cloudera-scm-agent config.ini file"
-  lineinfile: dest=/etc/cloudera-scm-agent/config.ini regexp='^# listening_hostname=.*' line="listening_hostname={{ inventory_hostname }}" owner=root group=root mode=0755 state=present backup=yes
-  when: is_cloud_node
-  notify: restart cloudera-scm-agent
-  tags:
-    - deploy-cm-agent
-    - install-cloudera-manager-agent
-    - create-cluster
+
+#- name: "update cloudera scm listening_hostname option in cloudera-scm-agent config.ini file"
+#  lineinfile: dest=/etc/cloudera-scm-agent/config.ini regexp='^# listening_hostname=.*' line="listening_hostname={{ inventory_hostname }}" owner=root group=root mode=0755 state=present backup=yes
+#  when: is_cloud_node
+#  notify: restart cloudera-scm-agent
+#  tags:
+#    - deploy-cm-agent
+#    - install-cloudera-manager-agent
+#    - create-cluster
 
 - name: "update /usr/sbin/cmf-agent ulimit nofiles setting"
   lineinfile: dest=/usr/sbin/cmf-agent regexp='^ulimit -n (\d+)' line='ulimit -n 1024000' owner=root group=root mode=0755 state=present backup=yes
