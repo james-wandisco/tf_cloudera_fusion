@@ -21,7 +21,7 @@ cm_repo_base: "http://mirror03.ashb.wandisco.com/cloudera-repos/{{cm_repo_versio
 cdh_major_version: "{{cdh_version|regex_replace('^(\\d+).*', '\\1')}}"
 cdh_repo_version: "CDH{{cdh_major_version}}"
 cdh_repo_base: "http://mirror03.ashb.wandisco.com/cloudera-repos/cdh{{cdh_major_version}}"
-cm_api_version: "v{% if cdh_version is version('5.13.0', '>=') %}18{% else %}7{% endif %}"
+cm_api_version: "32"
 cdh_version: 5.1.3
 cm_version: "{% if cdh_version == '5.4.2' %}5.4.1{% else %}{{cdh_version}}{% endif %}"
 cdh_parcel_version: 5.1.3-1.cdh5.1.3.p0.12
