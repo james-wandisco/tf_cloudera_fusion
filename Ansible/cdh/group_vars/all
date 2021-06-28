@@ -10,3 +10,6 @@ cm_repo_base: "http://mirror03.ashb.wandisco.com/cloudera-repos/{{cm_repo_versio
 
 is_running_parcels: true
 is_not_running_parcels: false
+
+
+java_home: /usr/java/{{oracle_jdk_version}}

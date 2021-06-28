@@ -1,4 +1,12 @@
 ---
+- hosts: cdh-all
+  become: yes
+  become_user: root
+  become_method: sudo
+  any_errors_fatal: true
+  gather_facts: no
+  roles:
+    - oracle-java
 
 - hosts: cdh-all
   become: yes
