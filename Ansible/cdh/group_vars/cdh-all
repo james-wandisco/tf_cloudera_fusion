@@ -10,7 +10,7 @@ cm_navm_group: "{{['cm-navigator-metaserver', cluster]|join('-')}}"
 cm_repm_group: "{{['cm-reports-manager', cluster]|join('-')}}"
 
 
-cm_server_fqdn: "{{ groups[cm_group][0] }}"
+cm_server_fqdn: manager
 cm_remote_server: "{% if external_manager is defined %}{{external_manager}}{% else %}{{cm_server_fqdn}}{% endif %}"
 cm_server_port: "718{% if has_manager_tls %}3{% else %}0{% endif %}"
 cm_server_ssl_port: 7183
