@@ -14,7 +14,7 @@ cm_server_fqdn: manager
 cm_remote_server: "{% if external_manager is defined %}{{external_manager}}{% else %}{{cm_server_fqdn}}{% endif %}"
 cm_server_port: "718{% if has_manager_tls %}3{% else %}0{% endif %}"
 cm_server_ssl_port: 7183
-cm_server_scheme: "http{% if has_manager_tls %}s{% endif %}"
+
 cm_major_version: "{{cm_version|regex_replace('^(\\d+).*', '\\1')|int}}"
 cm_repo_version: "CM{{cm_major_version}}"
 cm_repo_base: "http://mirror03.ashb.wandisco.com/cloudera-repos/{{cm_repo_version|lower}}"
@@ -77,7 +77,7 @@ cm_navigator_metaserver: "{{ groups[cm_navm_group][0] }}"
 cm_reports_manager: "{{ groups[cm_repm_group][0] }}"
 cm_slave_template: wd-slave-0
 cm_gateway_template: wd-gateway-0
-cm_api_uri: "{{ cm_server_scheme }}://{{ cm_remote_server }}:{{ cm_server_port }}/api/{{ cm_api_version }}"
+cm_api_uri: "http://{{ cm_remote_server }}:{{ cm_server_port }}/api/{{ cm_api_version }}"
 
 fusion_cdh_version: "{{ cdh_version|regex_replace('\\.\\d+$', '.0') }}"
 fusion_platform_type: "cdh"
